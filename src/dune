@@ -1,0 +1,14 @@
+(include_subdirs qualified)
+
+(executable
+ (name server)
+ (modules :standard)
+ (flags
+  (:standard -rectypes -w -26 -w -27 -w -33))
+ (libraries coq-core.kernel unix)
+)
+
+(coq.extraction
+ (prelude CodeExtraction)
+ (extracted_modules CoqServer Protocol)
+ (theories Extracted))

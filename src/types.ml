@@ -1,0 +1,1 @@
+type errorMsg = string option
