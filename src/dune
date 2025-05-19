@@ -5,8 +5,7 @@
  (modules :standard)
  (flags
   (:standard -rectypes -w -26 -w -27 -w -33))
- (libraries coq-core.kernel unix)
-)
+ (libraries coq-core.kernel unix))
 
 (coq.extraction
  (prelude CodeExtraction)
