@@ -12,7 +12,7 @@ Require ExtrOcamlChar.
 Require ExtrOcamlString.
 Require ExtrOcamlNativeString.
 
-Extraction Blacklist List String.
+Extraction Blacklist List String Uint63.
 
 Set Extraction Output Directory ".".
 

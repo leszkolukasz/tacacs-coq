@@ -194,10 +194,10 @@ Qed.
 Definition parse_2byte_number (data: string): option (int * string) :=
   match data with
   | String b1 (String b2 tl) =>
-    (* let n1 := of_nat (nat_of_ascii b1) in
+    let n1 := of_nat (nat_of_ascii b1) in
     let n2 := of_nat (nat_of_ascii b2) in
-    let n := (256 * n1 + n2)%sint63 in *)
-    Some (10%sint63, tl)
+    let n := (256 * n1 + n2)%sint63 in
+    Some (n, tl)
   | _ => None
   end.
 
@@ -210,16 +210,16 @@ Definition parse_nonce (data: string): Result (int * string) ErrorMsg :=
 Definition parse_user_len (data: string): Result (int * string) ErrorMsg :=
   match data with
   | String b1 tl =>
-    (* let n := Uint63.of_nat (nat_of_ascii b1) in *)
-    Ok (10%sint63, tl)
+    let n := Uint63.of_nat (nat_of_ascii b1) in
+    Ok (n, tl)
   | _ => Error (Some "Invalid user length format"%string)
   end.
 
 Definition parse_password_len (data: string): Result (int * string) ErrorMsg :=
   match data with
   | String b1 tl =>
-    (* let n := of_nat (nat_of_ascii b1) in *)
-    Ok (100%sint63, tl)
+    let n := of_nat (nat_of_ascii b1) in
+    Ok (n, tl)
   | _ => Error (Some "Invalid password length format"%string)
   end.
 
