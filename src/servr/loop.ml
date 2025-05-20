@@ -5,13 +5,16 @@ open Unix
 open Definitions
 open CoqServer
 open Uint63
+open Utils
 
 let rec loop (state: coq_ServerState) (buffer: bytes) : (unit, errorMsg) result =
   match state with
   | NotStarted | Stopped -> return ()
   | Running data ->
       match recv_packet data.socket buffer with
-      | Error _ -> loop state buffer
+      | Error _ as r ->
+        ignore @@ log_err @@ r;
+        loop state buffer
       | Ok (client_addr, packet_len) ->
         let strbuf = String.sub (Bytes.to_string buffer) 0 packet_len in
         let ipacket: coq_Packet = { data = strbuf; addr = client_addr } in
@@ -19,8 +22,9 @@ let rec loop (state: coq_ServerState) (buffer: bytes) : (unit, errorMsg) result 
         match opacket with
         | None -> loop new_state buffer
         | Some opacket ->
-          let obytes = Bytes.of_string opacket.data in
-          ignore @@ send_packet data.socket opacket.addr obytes (Bytes.length obytes);
+          let olen = String.length opacket.data in
+          Bytes.blit_string opacket.data 0 buffer 0 olen;
+          ignore @@ log_err @@ send_packet data.socket opacket.addr buffer olen;
           loop new_state buffer
 
 let loop_entry (state : coq_ServerState) : (unit, errorMsg) result =

@@ -4,10 +4,11 @@
  (name server)
  (modules :standard)
  (flags
-  (:standard -rectypes -w -26 -w -27 -w -33))
- (libraries coq-core.kernel unix))
+  (:standard -rectypes -w -26 -w -27 -w -33 -w -39))
+ (libraries coq-core.kernel coq-core.clib coq-core.vm unix))
 
 (coq.extraction
  (prelude CodeExtraction)
- (extracted_modules CoqServer Definitions)
+ (extracted_modules CoqPacket CoqServer Definitions
+   Ascii BinNat BinNums BinPos BinPosDef Bool Byte Datatypes Decimal DecidableClass Hexadecimal Nat Number PrimInt63)
  (theories Extracted))
