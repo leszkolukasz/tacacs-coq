@@ -9,5 +9,5 @@
 
 (coq.extraction
  (prelude CodeExtraction)
- (extracted_modules CoqServer Protocol)
+ (extracted_modules CoqServer Definitions)
  (theories Extracted))

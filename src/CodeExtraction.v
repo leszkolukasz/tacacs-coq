@@ -1,7 +1,7 @@
 Require Extraction.
 
 Require Export Extracted.CoqServer.
-Require Export Extracted.Protocol.
+Require Export Extracted.Definitions.
 
 Require ExtrOcamlBasic.
 Require ExtrOCamlInt63.
@@ -11,14 +11,13 @@ Require ExtrOcamlChar.
 Require ExtrOcamlString.
 Require ExtrOcamlNativeString.
 
-Extraction Blacklist List String Uint63.
+Extraction Blacklist List String.
 
 Set Extraction Output Directory ".".
 
-(* Extract Constant Uint63.int => "Override.i". *)
-(* Extract Constant oint => "int". *)
-
-(* Extraction Inline Uint63.int. *)
+Extract Inductive Definitions.Result => "Result.t" [ "Result.Ok" "Result.Error" ].
+Extract Constant Definitions.file_descr => "Unix.file_descr".
+Extract Constant Definitions.sockaddr => "Unix.sockaddr".
 
 Recursive Extraction Library CoqServer.
-Recursive Extraction Library Protocol.
+Recursive Extraction Library Definitions.
