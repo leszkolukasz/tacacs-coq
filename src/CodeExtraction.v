@@ -20,6 +20,8 @@ Extract Inductive Definitions.Result => "Result.t" [ "Result.Ok" "Result.Error" 
 Extract Constant Definitions.file_descr => "Unix.file_descr".
 Extract Constant Definitions.sockaddr => "Unix.sockaddr".
 
+Extract Constant Definitions.print_string => "fun s -> print_string s; print_newline (); flush stdout".
+
 Recursive Extraction Library CoqPacket.
 Recursive Extraction Library CoqServer.
 Recursive Extraction Library Definitions.

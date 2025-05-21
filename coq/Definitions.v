@@ -13,6 +13,7 @@ Definition ErrorMsg : Set := option string.
 
 Parameter file_descr : Set.
 Parameter sockaddr : Set.
+Parameter print_string : string -> unit.
 
 Record Packet : Set :=
   mkPacket
@@ -59,8 +60,9 @@ Inductive PacketType : Set :=
   | PacketSlipAddr.
 
 Inductive ResponseType: Set :=
-  | Accepted
-  | Rejected.
+  | ResponseNone
+  | ResponseAccepted
+  | ResponseRejected.
 
 Inductive ReasonType : Set :=
   | ReasonNone

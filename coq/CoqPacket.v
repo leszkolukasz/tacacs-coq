@@ -5,6 +5,8 @@ Require Import Definitions.
 
 Include Protocol.
 
+Open Scope string_scope.
+
 Definition version_type_of_ascii (c: ascii) : option VersionType :=
   match c with
   | "000"%char => Some Simple
@@ -16,6 +18,12 @@ Definition ascii_of_version_type (vt: VersionType) : ascii :=
   match vt with
   | Simple => Ascii.ascii_of_nat 0
   | Extended => Ascii.ascii_of_nat 128
+  end.
+
+Definition version_to_string (v: VersionType) : string :=
+  match v with
+  | Simple => "Simple"%string
+  | Extended => "Extended"%string
   end.
 
 Definition parse_version (data: string) : Result (VersionType * string) ErrorMsg :=
@@ -75,6 +83,21 @@ Definition ascii_of_packet_type (pt: PacketType) : ascii :=
   | PacketSlipAddr => Ascii.ascii_of_nat 11
   end.
 
+Definition packet_type_to_string (pt: PacketType) : string :=
+  match pt with
+  | PacketLogin => "Login"%string
+  | PacketResponse => "Response"%string
+  | PacketChange => "Change"%string
+  | PacketFollow => "Follow"%string
+  | PacketConnect => "Connect"%string
+  | PacketSuperuser => "Superuser"%string
+  | PacketLogout => "Logout"%string
+  | PacketReload => "Reload"%string
+  | PacketSlipOn => "SlipOn"%string
+  | PacketSlipOff => "SlipOff"%string
+  | PacketSlipAddr => "SlipAddr"%string
+  end.
+
 Definition parse_packet_type (data: string) : Result (PacketType * string) ErrorMsg :=
   match data with
   | String b tl =>
@@ -103,15 +126,24 @@ Qed.
 
 Definition response_type_of_ascii (c: ascii) : option ResponseType :=
   match c with
-  | "001"%char => Some Accepted
-  | "002"%char => Some Rejected
+  | "000"%char => Some ResponseNone
+  | "001"%char => Some ResponseAccepted
+  | "002"%char => Some ResponseRejected
   | _ => None
   end.
 
 Definition ascii_of_response_type (rt: ResponseType) : ascii :=
   match rt with
-  | Accepted => Ascii.ascii_of_nat 1
-  | Rejected => Ascii.ascii_of_nat 2
+  | ResponseNone => Ascii.ascii_of_nat 0
+  | ResponseAccepted => Ascii.ascii_of_nat 1
+  | ResponseRejected => Ascii.ascii_of_nat 2
+  end.
+
+Definition response_type_to_string (rt: ResponseType) : string :=
+  match rt with
+  | ResponseNone => "None"%string
+  | ResponseAccepted => "Accepted"%string
+  | ResponseRejected => "Rejected"%string
   end.
 
 Definition parse_response (data: string) : Result (ResponseType * string) ErrorMsg :=
@@ -163,6 +195,18 @@ Definition ascii_of_reason_type (rt: ReasonType) : ascii :=
   | ReasonIdle => Ascii.ascii_of_nat 5
   | ReasonDrop => Ascii.ascii_of_nat 6
   | ReasonBad => Ascii.ascii_of_nat 7
+  end.
+
+Definition reason_type_to_string (rt: ReasonType) : string :=
+  match rt with
+  | ReasonNone => "None"%string
+  | ReasonExpiring => "Expiring"%string
+  | ReasonPassword => "Password"%string
+  | ReasonDenied => "Denied"%string
+  | ReasonQuit => "Quit"%string
+  | ReasonIdle => "Idle"%string
+  | ReasonDrop => "Drop"%string
+  | ReasonBad => "Bad"%string
   end.
 
 Definition parse_reason (data: string) : Result (ReasonType * string) ErrorMsg :=
@@ -347,3 +391,32 @@ Definition parse_packet (data: string): Result ParsedPacket ErrorMsg :=
       end
     end
   end.
+
+Definition packet_to_string (p: ParsedPacket) : string :=
+  let version_str := version_to_string p.(version) in
+  let packet_type_str := packet_type_to_string p.(type) in
+  let nonce_str := "" in
+  let user_len_str := "" in
+  let password_len_str := "" in
+  let response_str := response_type_to_string p.(response) in
+  let reason_str := reason_type_to_string p.(reason) in
+  let result1_str := p.(result1) in
+  let destination_addr_str := "" in
+  let destination_port_str := "" in
+  let line_str := "" in
+  let result2_str := p.(result2) in
+  let result3_str := p.(result3) in
+  "Packet: " ++
+  "\nVersion: " ++ version_str ++
+  "\nType: " ++ packet_type_str ++
+  "\nNonce: " ++ nonce_str ++
+  "\nUser Length: " ++ user_len_str ++
+  "\nPassword Length: " ++ password_len_str ++
+  "\nResponse: " ++ response_str ++
+  "\nReason: " ++ reason_str ++
+  "\nResult 1: " ++ result1_str ++
+  "\nDestination Address: " ++ destination_addr_str ++
+  "\nDestination Port: " ++ destination_port_str ++
+  "\nLine: " ++ line_str ++
+  "\nResult 2: " ++ result2_str ++
+  "\nResult 3: " ++ result3_str.
