@@ -2,6 +2,7 @@ Require Import Sint63.
 Require Import String.
 Require Import Ascii.
 Require Import Definitions.
+Require Import CoqUtils.
 
 Include Protocol.
 
@@ -303,6 +304,22 @@ Definition parse_line (data: string): Result (int * string) ErrorMsg :=
   | None => Error (Some "Invalid line format"%string)
   end.
 
+Definition parse_username (data: string) (len: int): Ret (string * string) :=
+  if (len <=? 0)%sint63 then
+    Error (Some "Invalid username length"%string)
+  else
+    let username := substring 0 (to_nat len) data in
+    let remaining := substring (to_nat len) (String.length data - to_nat len) data in
+    Ok (username, remaining).
+
+Definition parse_password (data: string) (len: int): Ret (string * string) :=
+  if (len <=? 0)%sint63 then
+    Error (Some "Invalid password length"%string)
+  else
+    let password := substring 0 (to_nat len) data in
+    let remaining := substring (to_nat len) (String.length data - to_nat len) data in
+    Ok (password, remaining).
+
 (*
 0                   1                   2                   3
 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -326,58 +343,68 @@ Definition parse_line (data: string): Result (int * string) ErrorMsg :=
 Definition parse_packet (data: string): Result ParsedPacket ErrorMsg :=
   match parse_version data with
   | Error msg => Error msg
-  | Ok (version, tl1) =>
-    match parse_packet_type tl1 with
+  | Ok (version, tl) =>
+    match parse_packet_type tl with
     | Error msg => Error msg
-    | Ok (packet_type, tl2) =>
-      match parse_nonce tl2 with
+    | Ok (packet_type, tl) =>
+      match parse_nonce tl with
       | Error msg => Error msg
-      | Ok (nonce, tl3) =>
-        match parse_user_len tl3 with
+      | Ok (nonce, tl) =>
+        match parse_user_len tl with
         | Error msg => Error msg
-        | Ok (user_len, tl4) =>
-          match parse_password_len tl4 with
+        | Ok (user_len, tl) =>
+          match parse_password_len tl with
           | Error msg => Error msg
-          | Ok (password_len, tl5) =>
-            match parse_response tl5 with
+          | Ok (password_len, tl) =>
+            match parse_response tl with
             | Error msg => Error msg
-            | Ok (response, tl6) =>
-              match parse_reason tl6 with
+            | Ok (response, tl) =>
+              match parse_reason tl with
               | Error msg => Error msg
-              | Ok (reason, tl7) =>
-                match parse_4byte_result tl7 "1"%string with
+              | Ok (reason, tl) =>
+                match parse_4byte_result tl "1"%string with
                 | Error msg => Error msg
-                | Ok (result1, tl8) =>
-                  match parse_destination_address tl8 with
+                | Ok (result1, tl) =>
+                  match parse_destination_address tl with
                   | Error msg => Error msg
-                  | Ok (destination_addr, tl9) =>
-                    match parse_destination_port tl9 with
+                  | Ok (destination_addr, tl) =>
+                    match parse_destination_port tl with
                     | Error msg => Error msg
-                    | Ok (destination_port, tl10) =>
-                      match parse_line tl10 with
+                    | Ok (destination_port, tl) =>
+                      match parse_line tl with
                       | Error msg => Error msg
                       | Ok (line, tl11) =>
-                        match parse_4byte_result tl11 "2"%string with
+                        match parse_4byte_result tl "2"%string with
                         | Error msg => Error msg
-                        | Ok (result2, tl12) =>
-                          match parse_2byte_result tl12 with
+                        | Ok (result2, tl) =>
+                          match parse_2byte_result tl with
                           | Error msg => Error msg
-                          | Ok (result3, _) =>
-                            Ok ({|
-                              version := version ;
-                              type := packet_type ;
-                              nonce := nonce ;
-                              user_len := user_len ;
-                              password_len := password_len ;
-                              response := response ;
-                              reason := reason ;
-                              result1 := result1 ;
-                              destination_addr := destination_addr ;
-                              destination_port := destination_port ;
-                              line := line ;
-                              result2 := result2 ;
-                              result3 := result3 ;
-                            |})
+                          | Ok (result3, tl) =>
+                            match parse_username tl user_len with
+                            | Error msg => Error msg
+                            | Ok (username, tl) =>
+                              match parse_password tl password_len with
+                              | Error msg => Error msg
+                              | Ok (password, tl) =>
+                                Ok ({|
+                                  version := version ;
+                                  type := packet_type ;
+                                  nonce := nonce ;
+                                  user_len := user_len ;
+                                  password_len := password_len ;
+                                  response := response ;
+                                  reason := reason ;
+                                  result1 := result1 ;
+                                  destination_addr := destination_addr ;
+                                  destination_port := destination_port ;
+                                  line := line ;
+                                  result2 := result2 ;
+                                  result3 := result3 ;
+                                  p_username := username ;
+                                  p_password := password ;
+                                |})
+                              end
+                            end
                           end
                         end
                       end
@@ -406,17 +433,22 @@ Definition packet_to_string (p: ParsedPacket) : string :=
   let line_str := "" in
   let result2_str := p.(result2) in
   let result3_str := p.(result3) in
-  "Packet: " ++
-  "\nVersion: " ++ version_str ++
-  "\nType: " ++ packet_type_str ++
-  "\nNonce: " ++ nonce_str ++
-  "\nUser Length: " ++ user_len_str ++
-  "\nPassword Length: " ++ password_len_str ++
-  "\nResponse: " ++ response_str ++
-  "\nReason: " ++ reason_str ++
-  "\nResult 1: " ++ result1_str ++
-  "\nDestination Address: " ++ destination_addr_str ++
-  "\nDestination Port: " ++ destination_port_str ++
-  "\nLine: " ++ line_str ++
-  "\nResult 2: " ++ result2_str ++
-  "\nResult 3: " ++ result3_str.
+  "[PACKET]" ++ newline ++
+  "Version: " ++ version_str ++ newline ++
+  "Type: " ++ packet_type_str ++ newline ++
+  "Nonce: " ++ nonce_str ++ newline ++
+  "User Length: " ++ user_len_str ++ newline ++
+  "Password Length: " ++ password_len_str ++ newline ++
+  "Response: " ++ response_str ++ newline ++
+  "Reason: " ++ reason_str ++ newline ++
+  "Result 1: " ++ result1_str ++ newline ++
+  "Destination Address: " ++ destination_addr_str ++ newline ++
+  "Destination Port: " ++ destination_port_str ++ newline ++
+  "Line: " ++ line_str ++ newline ++
+  "Result 2: " ++ result2_str ++ newline ++
+  "Result 3: " ++ result3_str ++ newline ++
+  "Username: " ++ p.(p_username) ++ newline ++
+  "Password: " ++ p.(p_password).
+
+Definition serialize_packet (p: ParsedPacket) : string :=
+  packet_to_string p. (*TODO*)

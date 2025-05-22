@@ -1,6 +1,10 @@
 Require Import Uint63.
 Require Import String.
 Require Import Ascii.
+Require Import List.
+
+Import ListNotations.
+Open Scope list_scope.
 
 Inductive Result (a b : Type) :=
   | Ok (v: a)
@@ -11,9 +15,11 @@ Arguments Error {a b}.
 
 Definition ErrorMsg : Set := option string.
 
+Definition Ret (a : Type) := Result a ErrorMsg.
+
 Parameter file_descr : Set.
 Parameter sockaddr : Set.
-Parameter print_string : string -> unit.
+Parameter println : string -> unit.
 
 Record Packet : Set :=
   mkPacket
@@ -92,6 +98,15 @@ Record ParsedPacket: Set :=
       line: int ;
       result2: string ;
       result3: string ;
+      p_username: string ;
+      p_password: string ;
     }.
 
 End Protocol.
+
+Record User : Set :=
+  mkUser
+    {
+      u_username: string ;
+      u_password: string ;
+    }.
