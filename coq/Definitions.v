@@ -19,32 +19,9 @@ Definition Ret (a : Type) := Result a ErrorMsg.
 
 Parameter file_descr : Set.
 Parameter sockaddr : Set.
-Parameter println : string -> unit.
-
-Record Packet : Set :=
-  mkPacket
-    {
-      data: string ;
-      (* len: int ; *)
-      addr: sockaddr ;
-    }.
-
-Record ServerData : Set :=
-  mkServerData
-    {
-      port: int ;
-      socket: file_descr ;
-    }.
-
-Inductive ServerState : Set :=
-  | NotStarted
-  | Running (data: ServerData)
-  | Stopped.
-
-Inductive ServerEvent : Set :=
-  | Init (port: int) (socket: file_descr)
-  | Received (data: Packet).
-
+Parameter println : string -> bool.
+Parameter int_to_string : int -> string.
+Parameter eq_sockaddr : sockaddr -> sockaddr -> bool.
 
 Module Protocol.
 
@@ -109,4 +86,42 @@ Record User : Set :=
     {
       u_username: string ;
       u_password: string ;
+      superuser: bool ;
     }.
+
+Record Packet : Set :=
+  mkPacket
+    {
+      data: string ;
+      (* len: int ; *)
+      addr: sockaddr ;
+    }.
+
+Inductive ConnectionMode : Set :=
+  | Normal
+  | Slip (logout : bool).
+
+Record Connection : Set :=
+  mkConnection
+    {
+      client_addr: sockaddr ;
+      mode: ConnectionMode ;
+      slip_addr: option Protocol.IPAddress ;
+    }.
+
+Record ServerData : Set :=
+  mkServerData
+    {
+      port: int ;
+      socket: file_descr ;
+      connections: list Connection ;
+    }.
+
+Inductive ServerState : Set :=
+  | NotStarted
+  | Running (data: ServerData)
+  | Stopped.
+
+Inductive ServerEvent : Set :=
+  | Init (port: int) (socket: file_descr)
+  | Received (data: Packet).

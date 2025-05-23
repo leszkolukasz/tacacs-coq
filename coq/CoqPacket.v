@@ -8,6 +8,8 @@ Include Protocol.
 
 Open Scope string_scope.
 
+(* VersionType *)
+
 Definition version_type_of_ascii (c: ascii) : option VersionType :=
   match c with
   | "000"%char => Some Simple
@@ -52,6 +54,9 @@ Proof.
   intros.
   destruct v; now simpl.
 Qed.
+
+
+(* PacketType *)
 
 Definition packet_type_of_ascii (c: ascii) : option PacketType :=
   match c with
@@ -125,6 +130,9 @@ Proof.
   destruct p; now simpl.
 Qed.
 
+
+(* ResponseType *)
+
 Definition response_type_of_ascii (c: ascii) : option ResponseType :=
   match c with
   | "000"%char => Some ResponseNone
@@ -172,6 +180,9 @@ Proof.
   intros.
   destruct r; now simpl.
 Qed.
+
+
+(* ReasonType *)
 
 Definition reason_type_of_ascii (c: ascii) : option ReasonType :=
   match c with
@@ -236,6 +247,9 @@ Proof.
   destruct r; now simpl.
 Qed.
 
+
+(* Other *)
+
 Definition parse_2byte_number (data: string): option (int * string) :=
   match data with
   | String b1 (String b2 tl) =>
@@ -284,6 +298,17 @@ Definition parse_2byte_result (data: string): Result (string * string) ErrorMsg 
   | _ => Error (Some "Invalid result3 format"%string)
   end.
 
+Definition destination_address_to_string (addr: IPAddress): string :=
+  let '(b1, b2, b3, b4) := addr in
+  let n1 := of_nat (nat_of_ascii b1) in
+  let n2 := of_nat (nat_of_ascii b2) in
+  let n3 := of_nat (nat_of_ascii b3) in
+  let n4 := of_nat (nat_of_ascii b4) in
+  int_to_string n1 ++ "." ++
+  int_to_string n2 ++ "." ++
+  int_to_string n3 ++ "." ++
+  int_to_string n4.
+
 Definition parse_destination_address (data: string): Result (IPAddress * string) ErrorMsg :=
   match data with
   | String b1 (String b2 (String b3 (String b4 tl))) =>
@@ -310,7 +335,10 @@ Definition parse_username (data: string) (len: int): Ret (string * string) :=
   else
     let username := substring 0 (to_nat len) data in
     let remaining := substring (to_nat len) (String.length data - to_nat len) data in
-    Ok (username, remaining).
+    if ((of_nat (String.length username)) =? len)%sint63 then
+      Ok (username, remaining)
+    else
+      Error (Some "Invalid username format"%string).
 
 Definition parse_password (data: string) (len: int): Ret (string * string) :=
   if (len <=? 0)%sint63 then
@@ -318,7 +346,11 @@ Definition parse_password (data: string) (len: int): Ret (string * string) :=
   else
     let password := substring 0 (to_nat len) data in
     let remaining := substring (to_nat len) (String.length data - to_nat len) data in
-    Ok (password, remaining).
+    if ((of_nat (String.length password)) =? len)%sint63 then
+      Ok (password, remaining)
+    else
+      Error (Some "Invalid password format"%string).
+
 
 (*
 0                   1                   2                   3
@@ -373,7 +405,7 @@ Definition parse_packet (data: string): Result ParsedPacket ErrorMsg :=
                     | Ok (destination_port, tl) =>
                       match parse_line tl with
                       | Error msg => Error msg
-                      | Ok (line, tl11) =>
+                      | Ok (line, tl) =>
                         match parse_4byte_result tl "2"%string with
                         | Error msg => Error msg
                         | Ok (result2, tl) =>
@@ -386,23 +418,26 @@ Definition parse_packet (data: string): Result ParsedPacket ErrorMsg :=
                               match parse_password tl password_len with
                               | Error msg => Error msg
                               | Ok (password, tl) =>
-                                Ok ({|
-                                  version := version ;
-                                  type := packet_type ;
-                                  nonce := nonce ;
-                                  user_len := user_len ;
-                                  password_len := password_len ;
-                                  response := response ;
-                                  reason := reason ;
-                                  result1 := result1 ;
-                                  destination_addr := destination_addr ;
-                                  destination_port := destination_port ;
-                                  line := line ;
-                                  result2 := result2 ;
-                                  result3 := result3 ;
-                                  p_username := username ;
-                                  p_password := password ;
-                                |})
+                                match tl with
+                                | EmptyString => Ok ({|
+                                    version := version ;
+                                    type := packet_type ;
+                                    nonce := nonce ;
+                                    user_len := user_len ;
+                                    password_len := password_len ;
+                                    response := response ;
+                                    reason := reason ;
+                                    result1 := result1 ;
+                                    destination_addr := destination_addr ;
+                                    destination_port := destination_port ;
+                                    line := line ;
+                                    result2 := result2 ;
+                                    result3 := result3 ;
+                                    p_username := username ;
+                                    p_password := password ;
+                                  |})
+                                | _ => Error (Some "Found data after end of packet")
+                                end
                               end
                             end
                           end
@@ -422,15 +457,15 @@ Definition parse_packet (data: string): Result ParsedPacket ErrorMsg :=
 Definition packet_to_string (p: ParsedPacket) : string :=
   let version_str := version_to_string p.(version) in
   let packet_type_str := packet_type_to_string p.(type) in
-  let nonce_str := "" in
-  let user_len_str := "" in
-  let password_len_str := "" in
+  let nonce_str := int_to_string p.(nonce) in
+  let user_len_str := int_to_string p.(user_len) in
+  let password_len_str := int_to_string p.(password_len) in
   let response_str := response_type_to_string p.(response) in
   let reason_str := reason_type_to_string p.(reason) in
   let result1_str := p.(result1) in
-  let destination_addr_str := "" in
-  let destination_port_str := "" in
-  let line_str := "" in
+  let destination_addr_str := destination_address_to_string p.(destination_addr) in
+  let destination_port_str := int_to_string p.(destination_port) in
+  let line_str := int_to_string p.(line) in
   let result2_str := p.(result2) in
   let result3_str := p.(result3) in
   "[PACKET]" ++ newline ++

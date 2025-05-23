@@ -9,6 +9,6 @@
 
 (coq.extraction
  (prelude CodeExtraction)
- (extracted_modules CoqPacket CoqServer CoqUtils Definitions
-   Ascii BinNat BinInt BinNums BinPos BinPosDef Bool Byte Datatypes Decimal DecidableClass Hexadecimal Nat Number Logic PrimInt63 Specif Uint0 String0)
+ (extracted_modules CoqPacket CoqServer CoqDatabase CoqUtils Definitions
+   Ascii BinNat BinInt BinNums BinPos BinPosDef Bool Byte Datatypes Decimal DecidableClass Hexadecimal Nat Number Logic PrimInt63 Specif Uint0 String0 List0)
  (theories Extracted))

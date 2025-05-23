@@ -5,7 +5,7 @@ PASSWORD_LEN=$(printf "%s" "$PASSWORD" | wc -c)
 
 {
   printf '\x80'                                       # Version (128)
-  printf '\x01'                                       # Type (LOGIN)
+  printf '\x06'                                       # Type (SSUPERUSER)
   printf '\x00\x02'                                   # Nonce (2)
   printf "%02x" "$USERNAME_LEN" | xxd -r -p           # Username length
   printf "%02x" "$PASSWORD_LEN" | xxd -r -p           # Password length
