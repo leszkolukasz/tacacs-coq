@@ -103,7 +103,7 @@ Definition handle_slip_addr (packet: ParsedPacket) (sdata: ServerData) (clnt_add
   end.
 
 Definition handle_packet (packet: ParsedPacket) (sdata: ServerData) (clnt_addr: sockaddr) : THandlePacket :=
-  match packet.(type) with
+  match packet.(kind) with
   | PacketLogin => handle_login packet sdata clnt_addr
   | PacketResponse => handle_response packet sdata clnt_addr
   | PacketChange => handle_change packet sdata clnt_addr

@@ -63,7 +63,7 @@ Record ParsedPacket: Set :=
   mkParsedPacket
     {
       version: VersionType ;
-      type: PacketType ;
+      kind: PacketType ;
       nonce: int ;
       user_len: int ;
       password_len: int ;

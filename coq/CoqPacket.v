@@ -421,7 +421,7 @@ Definition parse_packet (data: string): Result ParsedPacket ErrorMsg :=
                                 match tl with
                                 | EmptyString => Ok ({|
                                     version := version ;
-                                    type := packet_type ;
+                                    kind := packet_type ;
                                     nonce := nonce ;
                                     user_len := user_len ;
                                     password_len := password_len ;
@@ -454,9 +454,53 @@ Definition parse_packet (data: string): Result ParsedPacket ErrorMsg :=
     end
   end.
 
+Definition char_of_int (n: int) : ascii :=
+  Ascii.ascii_of_nat (to_nat n).
+
+Definition serialize_version (vt: VersionType) : string :=
+  String (ascii_of_version_type vt) "".
+
+Definition serialize_packet_type (pt: PacketType) : string :=
+  String (ascii_of_packet_type pt) "".
+
+Definition serialize_short (n: int) : string :=
+  let high := (n / 256)%sint63 in
+  let low := (n mod 256)%sint63 in
+  String (char_of_int high) (String (char_of_int low) "").
+
+Definition serialize_byte (n: int) : string :=
+  String (char_of_int n) "".
+
+Definition serialize_ip_address (addr: IPAddress) : string :=
+  let '(b1, b2, b3, b4) := addr in
+  String b1 (String b2 (String b3 (String b4 ""))).
+
+Definition serialize_response (rt: ResponseType) : string :=
+  String (ascii_of_response_type rt) "".
+
+Definition serialize_reason (rt: ReasonType) : string :=
+  String (ascii_of_reason_type rt) "".
+
+Definition serialize_packet (p: ParsedPacket) : string :=
+  serialize_version p.(version) ++
+  serialize_packet_type p.(kind) ++
+  serialize_short p.(nonce) ++
+  serialize_byte p.(user_len) ++
+  serialize_byte p.(password_len) ++
+  serialize_response p.(response) ++
+  serialize_reason p.(reason) ++
+  p.(result1) ++
+  serialize_ip_address p.(destination_addr) ++
+  serialize_short p.(destination_port) ++
+  serialize_short p.(line) ++
+  p.(result2) ++
+  p.(result3) ++
+  p.(p_username) ++
+  p.(p_password).
+
 Definition packet_to_string (p: ParsedPacket) : string :=
   let version_str := version_to_string p.(version) in
-  let packet_type_str := packet_type_to_string p.(type) in
+  let packet_type_str := packet_type_to_string p.(kind) in
   let nonce_str := int_to_string p.(nonce) in
   let user_len_str := int_to_string p.(user_len) in
   let password_len_str := int_to_string p.(password_len) in
@@ -470,7 +514,7 @@ Definition packet_to_string (p: ParsedPacket) : string :=
   let result3_str := p.(result3) in
   "[PACKET]" ++ newline ++
   "Version: " ++ version_str ++ newline ++
-  "Type: " ++ packet_type_str ++ newline ++
+  "Kind: " ++ packet_type_str ++ newline ++
   "Nonce: " ++ nonce_str ++ newline ++
   "User Length: " ++ user_len_str ++ newline ++
   "Password Length: " ++ password_len_str ++ newline ++
@@ -484,6 +528,3 @@ Definition packet_to_string (p: ParsedPacket) : string :=
   "Result 3: " ++ result3_str ++ newline ++
   "Username: " ++ p.(p_username) ++ newline ++
   "Password: " ++ p.(p_password).
-
-Definition serialize_packet (p: ParsedPacket) : string :=
-  packet_to_string p. (*TODO*)

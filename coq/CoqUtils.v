@@ -31,7 +31,7 @@ Infix "|>" := pipe (at level 50, left associativity).
 Definition with_packet_type (t: PacketType) (packet: ParsedPacket) : ParsedPacket :=
 	{|
 		version := packet.(version);
-		type := t;
+		kind := t;
 		nonce := packet.(nonce);
 		user_len := packet.(user_len);
 		password_len := packet.(password_len);
@@ -50,7 +50,7 @@ Definition with_packet_type (t: PacketType) (packet: ParsedPacket) : ParsedPacke
 Definition with_response_type (r: ResponseType) (packet: ParsedPacket) : ParsedPacket :=
 	{|
 		version := packet.(version);
-		type := packet.(type);
+		kind := packet.(kind);
 		nonce := packet.(nonce);
 		user_len := packet.(user_len);
 		password_len := packet.(password_len);
@@ -69,7 +69,7 @@ Definition with_response_type (r: ResponseType) (packet: ParsedPacket) : ParsedP
 Definition with_reason_type (r: ReasonType) (packet: ParsedPacket) : ParsedPacket :=
 	{|
 		version := packet.(version);
-		type := packet.(type);
+		kind := packet.(kind);
 		nonce := packet.(nonce);
 		user_len := packet.(user_len);
 		password_len := packet.(password_len);
@@ -88,7 +88,7 @@ Definition with_reason_type (r: ReasonType) (packet: ParsedPacket) : ParsedPacke
 Definition with_results (r1 r2 r3: string) (packet: ParsedPacket) : ParsedPacket :=
 	{|
 		version := packet.(version);
-		type := packet.(type);
+		kind := packet.(kind);
 		nonce := packet.(nonce);
 		user_len := packet.(user_len);
 		password_len := packet.(password_len);
@@ -107,7 +107,7 @@ Definition with_results (r1 r2 r3: string) (packet: ParsedPacket) : ParsedPacket
 Definition with_data (uname pwd : string) (packet: ParsedPacket) : ParsedPacket :=
 	{|
 		version := packet.(version);
-		type := packet.(type);
+		kind := packet.(kind);
 		nonce := packet.(nonce);
 		user_len := packet.(user_len); (* lengths need to be copied *)
 		password_len := packet.(password_len);
