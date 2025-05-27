@@ -6,18 +6,8 @@ open CoqUtils
 open Bindings
 open Types
 
-(* Constants from TACACS protocol *)
-(* let tacacs_version = 0x80 Version 128 *)
-
-let default_server_port =
-  Globals.server_port (* Port 49 according to RFC, using 3000 for testing *)
-
-let max_packet_size = Globals.max_tacacs_packet_size (* 536 bytes *)
-
-(* Convert between OCaml and Coq types *)
-(* let coq_ip_to_ocaml_ip (addr : coq_IPAddress) : int * int * int * int =
-  let ((b1, b2), b3), b4 = addr in
-  (Char.code b1, Char.code b2, Char.code b3, Char.code b4) *)
+let default_server_port = Globals.server_port
+let max_packet_size = Globals.max_tacacs_packet_size
 
 let ocaml_ip_to_coq_ip (a, b, c, d) : coq_IPAddress =
   (((Char.chr a, Char.chr b), Char.chr c), Char.chr d)
@@ -32,7 +22,6 @@ let ip_address_of_string (ip_str : string) : int * int * int * int =
   try Scanf.sscanf ip_str "%d.%d.%d.%d" (fun a b c d -> (a, b, c, d))
   with _ -> failwith ("Invalid IP address format: " ^ ip_str)
 
-(* Client class encapsulating TACACS functionality *)
 class tacacs_client server_host server_port =
   let addr =
     try (gethostbyname server_host).h_addr_list.(0)
@@ -60,7 +49,6 @@ class tacacs_client server_host server_port =
       self#init_socket ();
       match socket_opt with
       | Some sock -> (
-          (* Build packet using CoqClient functions *)
           match
             build_and_serialize_packet packet_type username password dest_addr
               dest_port
@@ -71,7 +59,6 @@ class tacacs_client server_host server_port =
                 | Some s -> s
                 | None -> "Failed to build packet")
           | Ok serialized_data -> (
-              (* Send packet *)
               let bytes = Bytes.of_string serialized_data in
               let sent =
                 sendto sock bytes 0 (Bytes.length bytes) [] server_sockaddr
@@ -79,16 +66,13 @@ class tacacs_client server_host server_port =
               if sent <> Bytes.length bytes then
                 failwith "Failed to send complete packet";
 
-              (* Set socket timeout *)
               setsockopt_float sock SO_RCVTIMEO 5.0;
 
-              (* Receive response *)
               let buffer = Bytes.create max_packet_size in
               try
                 let len, _ = recvfrom sock buffer 0 max_packet_size [] in
                 if len <= 0 then failwith "Empty response received";
 
-                (* Parse response *)
                 let response_data = Bytes.sub_string buffer 0 len in
                 match parse_packet response_data with
                 | Ok packet -> (
@@ -110,9 +94,6 @@ class tacacs_client server_host server_port =
               | e -> failwith (Printexc.to_string e)))
       | None -> failwith "Socket initialization failed"
 
-    (* High-level API methods for TACACS operations *)
-
-    (* Login to the TACACS server *)
     method login username password =
       let empty_addr = (((Char.chr 0, Char.chr 0), Char.chr 0), Char.chr 0) in
       let response =
@@ -121,7 +102,6 @@ class tacacs_client server_host server_port =
       in
       response
 
-    (* Request superuser privileges *)
     method superuser username password =
       let empty_addr = (((Char.chr 0, Char.chr 0), Char.chr 0), Char.chr 0) in
       let response =
@@ -130,7 +110,6 @@ class tacacs_client server_host server_port =
       in
       response
 
-    (* Request connection to a remote host *)
     method connect_request (dest_ip : int * int * int * int) (dest_port : int) =
       let coq_ip = ocaml_ip_to_coq_ip dest_ip in
       let coq_port = Uint63.of_int dest_port in
@@ -139,7 +118,6 @@ class tacacs_client server_host server_port =
       in
       response
 
-    (* Logout from the TACACS server *)
     method logout =
       let empty_addr = (((Char.chr 0, Char.chr 0), Char.chr 0), Char.chr 0) in
       let response =
@@ -147,7 +125,6 @@ class tacacs_client server_host server_port =
       in
       response
 
-    (* Set SLIP address *)
     method set_slip_address (ip_addr : int * int * int * int) =
       let coq_ip = ocaml_ip_to_coq_ip ip_addr in
       let response =
@@ -156,7 +133,6 @@ class tacacs_client server_host server_port =
       response
   end
 
-(* Command-line interface *)
 let usage =
   "Usage: tacacs_cli [options] command [args...]\n\
    Commands:\n\
@@ -171,7 +147,6 @@ let usage =
   \  -p, --port <port>                      - TACACS server port (default: 3000)\n\
   \  --help                                 - Display this help message"
 
-(* Process the command line arguments and perform requested operations *)
 let main () =
   let host = ref "localhost" in
   let port = ref default_server_port in
@@ -266,5 +241,4 @@ let main () =
       Printf.printf "Unknown command: %s\nUse --help for usage information.\n"
         cmd
 
-(* Entry point *)
 let () = main ()
