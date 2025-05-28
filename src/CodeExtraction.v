@@ -5,6 +5,7 @@ Require Export Extracted.CoqPacket.
 Require Export Extracted.CoqServer.
 Require Export Extracted.CoqDatabase.
 Require Export Extracted.CoqUtils.
+Require Export Extracted.CoqClient.
 
 Require ExtrOcamlBasic.
 Require ExtrOCamlInt63.
@@ -33,5 +34,6 @@ Extract Constant Definitions.eq_sockaddr => "(fun x y -> x = y)".
 Recursive Extraction Library CoqUtils.
 Recursive Extraction Library CoqPacket.
 Recursive Extraction Library CoqServer.
+Recursive Extraction Library CoqClient.
 Recursive Extraction Library CoqDatabase.
 Recursive Extraction Library Definitions.

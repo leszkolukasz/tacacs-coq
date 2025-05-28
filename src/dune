@@ -1,14 +1,45 @@
 (include_subdirs qualified)
 
-(executable
- (name server)
- (modules :standard)
+; (executable
+;  (name server)
+;  (modules :standard)
+;  (flags
+;   (:standard -rectypes -w -26 -w -27 -w -33 -w -39))
+;  (libraries coq-core.kernel coq-core.clib coq-core.vm unix))
+
+(executables
+ (names server client)
  (flags
   (:standard -rectypes -w -26 -w -27 -w -33 -w -39))
- (libraries coq-core.kernel coq-core.clib coq-core.vm unix))
+ (libraries coq-core.kernel coq-core.clib coq-core.vm unix str))
 
 (coq.extraction
  (prelude CodeExtraction)
- (extracted_modules CoqPacket CoqServer CoqDatabase CoqUtils Definitions
-   Ascii BinNat BinInt BinNums BinPos BinPosDef Bool Byte Datatypes Decimal DecidableClass Hexadecimal Nat Number Logic PrimInt63 Specif Uint0 String0 List0)
+ (extracted_modules
+  CoqPacket
+  CoqClient
+  CoqServer
+  CoqDatabase
+  CoqUtils
+  Definitions
+  Ascii
+  BinNat
+  BinInt
+  BinNums
+  BinPos
+  BinPosDef
+  Bool
+  Byte
+  Datatypes
+  Decimal
+  DecidableClass
+  Hexadecimal
+  Nat
+  Number
+  Logic
+  PrimInt63
+  Specif
+  Uint0
+  String0
+  List0)
  (theories Extracted))
