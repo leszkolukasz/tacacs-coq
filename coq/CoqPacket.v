@@ -3,6 +3,7 @@ Require Import String.
 Require Import Ascii.
 Require Import Definitions.
 Require Import CoqUtils.
+Require Import Lia.
 
 Include Protocol.
 
@@ -330,7 +331,7 @@ Definition parse_line (data: string): Result (int * string) ErrorMsg :=
   end.
 
 Definition parse_username (data: string) (len: int): Ret (string * string) :=
-  if (len <=? 0)%sint63 then
+  if (len <? 0)%sint63 then
     Error (Some "Invalid username length"%string)
   else
     let username := substring 0 (to_nat len) data in
@@ -341,7 +342,7 @@ Definition parse_username (data: string) (len: int): Ret (string * string) :=
       Error (Some "Invalid username format"%string).
 
 Definition parse_password (data: string) (len: int): Ret (string * string) :=
-  if (len <=? 0)%sint63 then
+  if (len <? 0)%sint63 then
     Error (Some "Invalid password length"%string)
   else
     let password := substring 0 (to_nat len) data in
@@ -528,3 +529,313 @@ Definition packet_to_string (p: ParsedPacket) : string :=
   "Result 3: " ++ result3_str ++ newline ++
   "Username: " ++ p.(p_username) ++ newline ++
   "Password: " ++ p.(p_password).
+
+Definition is_one_byte (n: int): bool :=
+  (0 <=? n <? 256)%sint63.
+
+Definition is_two_byte (n: int): bool :=
+  (0 <=? n <? 65536)%sint63.
+
+Lemma ascii_of_version_type_non_empty:
+  forall vt, (String (ascii_of_version_type vt) "") <> "".
+Proof.
+  intros.
+  destruct vt; congruence.
+Qed.
+
+Lemma string_len_4:
+  forall s,
+  String.length s = 4 -> exists b1 b2 b3 b4, s = String b1 (String b2 (String b3 (String b4 ""))).
+Proof.
+  intros.
+  destruct s as [|b1 [|b2 [|b3 [|b4 tl]]]].
+  * simpl in H. congruence.
+  * simpl in H. congruence.
+  * simpl in H. congruence.
+  * simpl in H. congruence.
+  * exists b1, b2, b3, b4.
+    destruct tl.
+    ** reflexivity.
+    ** simpl in H. congruence.
+Qed.  
+
+
+Lemma string_len_2:
+  forall s,
+  String.length s = 2 -> exists b1 b2, s = String b1 (String b2 "").
+Proof.
+  intros.
+  destruct s as [|b1 [|b2 tl]].
+  * simpl in H. congruence.
+  * simpl in H. congruence.
+  * exists b1, b2.
+    destruct tl.
+    ** reflexivity.
+    ** simpl in H. congruence.
+Qed.
+
+Lemma serialize_parse_byte:
+  forall (n: int),
+    is_one_byte n = true -> of_nat (nat_of_ascii (char_of_int n)) = n.
+Proof.
+  intros.
+  unfold char_of_int.
+Admitted.
+
+Lemma serialize_parse_two_byte:
+  forall (n: int),
+    is_two_byte n = true ->
+    (256 * of_nat (nat_of_ascii (char_of_int (n / 256))) + of_nat (nat_of_ascii (char_of_int (n mod 256))))%sint63 = n.
+Proof.
+Admitted.
+
+Lemma to_nat_of_nat:
+  forall (n: int),
+    (0 <=? n)%sint63 = true -> of_nat (to_nat n) = n.
+Proof.
+  intros n H.
+Admitted.
+
+Lemma prefix_correct2:
+  forall (s: string) (tl: string),
+    substring 0 (String.length s) (s ++ tl) = s.
+Proof.
+  intros s tl.
+  induction (length s) eqn:Hlen.
+  * simpl.
+Admitted.
+
+Lemma substring_skip:
+  forall (s1 s2: string),
+    substring (length s1) (length (s1 ++ s2) - length s1) (s1 ++ s2) = s2.
+Proof.
+  intros s1 s2.
+Admitted.
+
+Lemma substring_skip2:
+  forall (s1: string),
+    substring (length s1) 0 s1 = "".
+Proof.
+  intros.
+  induction s1.
+  * simpl. reflexivity.
+  * simpl.
+    rewrite IHs1.
+    reflexivity.
+Qed. 
+
+Lemma prefix_eq:
+  forall (s1: string),
+    prefix s1 s1 = true.
+Proof.
+  intros s1.
+  unfold prefix.
+  induction s1.
+  * simpl. reflexivity.
+  * simpl.
+    rewrite IHs1.
+    destruct ascii_dec.
+    ** reflexivity.
+    ** contradiction.
+Qed.
+
+Lemma prefix_correct3:
+  forall (s1: string),
+    substring 0 (String.length s1) s1 = s1.
+Proof.
+Admitted.
+
+Lemma serialize_parse_packet_id:
+  forall (p: ParsedPacket) (s: string),
+     (String.length p.(result1) = 4) ->
+     (String.length p.(result2) = 4) ->
+     (String.length p.(result3) = 2) ->
+     (is_one_byte p.(user_len)) = true ->
+     (is_one_byte p.(password_len)) = true ->
+     (is_two_byte p.(nonce)) = true ->
+     (is_two_byte p.(destination_port)) = true ->
+     (is_two_byte p.(line)) = true ->
+     (String.length (p.(p_username)) = to_nat p.(user_len)) ->
+     (String.length (p.(p_password)) = to_nat p.(password_len)) ->
+     s = serialize_packet p -> parse_packet s = Ok p.
+Proof.
+  intros p s Hlen1 Hlen2 Hlen3 HUlen HUpass HNonce HDest HLine HUlenStr HUpassStr H.
+  unfold serialize_packet in H.
+  subst s.
+  unfold parse_packet.
+  unfold parse_version.
+  destruct (serialize_version (version p)) eqn:Hv.
+  * apply ascii_of_version_type_non_empty in Hv. contradiction.
+  * remember (
+    serialize_packet_type (kind p) ++
+    serialize_short (nonce p) ++
+    serialize_byte (user_len p) ++
+    serialize_byte (password_len p) ++
+    serialize_response (response p) ++
+    serialize_reason (reason p) ++
+    result1 p ++
+    serialize_ip_address (destination_addr p) ++
+    serialize_short (destination_port p) ++
+    serialize_short (line p) ++ result2 p ++ result3 p ++ p_username p ++ p_password p
+  ) as rest.
+    simpl. injection Hv. intros. subst a s. clear Hv.
+    rewrite version_ascii_id2.
+    simpl.
+    remember (serialize_short (nonce p) ++
+      serialize_byte (user_len p) ++
+      serialize_byte (password_len p) ++
+      serialize_response (response p) ++
+      serialize_reason (reason p) ++
+      result1 p ++
+      serialize_ip_address (destination_addr p) ++
+      serialize_short (destination_port p) ++
+      serialize_short (line p) ++ result2 p ++ result3 p ++ p_username p ++ p_password p
+    ) as rest2 in Heqrest.
+    subst rest.
+    simpl.
+    rewrite packet_ascii_id2.
+    remember (
+      serialize_byte (user_len p) ++
+      serialize_byte (password_len p) ++
+      serialize_response (response p) ++
+      serialize_reason (reason p) ++
+      result1 p ++
+      serialize_ip_address (destination_addr p) ++
+      serialize_short (destination_port p) ++
+      serialize_short (line p) ++ result2 p ++ result3 p ++ p_username p ++ p_password p
+    ) as rest3 in Heqrest2.
+    subst rest2.
+    simpl.
+    remember (
+      serialize_byte (password_len p) ++
+      serialize_response (response p) ++
+      serialize_reason (reason p) ++
+      result1 p ++
+      serialize_ip_address (destination_addr p) ++
+      serialize_short (destination_port p) ++
+      serialize_short (line p) ++ result2 p ++ result3 p ++ p_username p ++ p_password p
+    ) as rest4 in Heqrest3.
+    subst rest3.
+    simpl.
+    remember (
+      serialize_response (response p) ++
+      serialize_reason (reason p) ++
+      result1 p ++
+      serialize_ip_address (destination_addr p) ++
+      serialize_short (destination_port p) ++
+      serialize_short (line p) ++ result2 p ++ result3 p ++ p_username p ++ p_password p
+    ) as rest5 in Heqrest4.
+    subst rest4.
+    simpl.
+    remember (
+      serialize_reason (reason p) ++
+      result1 p ++
+      serialize_ip_address (destination_addr p) ++
+      serialize_short (destination_port p) ++
+      serialize_short (line p) ++ result2 p ++ result3 p ++ p_username p ++ p_password p
+    ) as rest6 in Heqrest5.
+    subst rest5.
+    simpl.
+    rewrite response_ascii_id2.
+    remember (
+      result1 p ++
+      serialize_ip_address (destination_addr p) ++
+      serialize_short (destination_port p) ++
+      serialize_short (line p) ++ result2 p ++ result3 p ++ p_username p ++ p_password p
+    ) as rest7 in Heqrest6.
+    subst rest6.
+    simpl.
+    rewrite reason_ascii_id2.
+    remember (
+      serialize_ip_address (destination_addr p) ++
+      serialize_short (destination_port p) ++
+      serialize_short (line p) ++ result2 p ++ result3 p ++ p_username p ++ p_password p
+    ) as rest8 in Heqrest7.
+    subst rest7.
+    apply string_len_4 in Hlen1.
+    destruct Hlen1 as [b11 [b12 [b13 [b14 Hlen1]]]].
+    rewrite Hlen1.
+    simpl.
+    remember (
+      serialize_short (destination_port p) ++
+      serialize_short (line p) ++ result2 p ++ result3 p ++ p_username p ++ p_password p
+    ) as rest9 in Heqrest8.
+    subst rest8.
+    destruct (destination_addr p) as [ip1 ip4] eqn:Heqip.
+    destruct ip1 as [ip1 ip3].
+    destruct ip1 as [ip1 ip2].
+    unfold serialize_ip_address.
+    simpl.
+    remember (
+      serialize_short (line p) ++ result2 p ++ result3 p ++ p_username p ++ p_password p
+    ) as rest10 in Heqrest9.
+    subst rest9.
+    simpl.
+    remember (
+      result2 p ++ result3 p ++ p_username p ++ p_password p
+    ) as rest11 in Heqrest10.
+    subst rest10.
+    simpl.
+    remember (
+      result3 p ++ p_username p ++ p_password p
+    ) as rest12 in Heqrest11.
+    subst rest11.
+    apply string_len_4 in Hlen2.
+    destruct Hlen2 as [b21 [b22 [b23 [b24 Hlen2]]]].
+    rewrite Hlen2.
+    simpl.
+    remember (
+      p_username p ++ p_password p
+    ) as rest13 in Heqrest12.
+    subst rest12.
+    apply string_len_2 in Hlen3.
+    destruct Hlen3 as [b31 [b32 Hlen3]].
+    rewrite Hlen3.
+    simpl.
+    remember (p_password p) as rest14 in Heqrest13.
+    subst rest13.
+    unfold parse_username.
+    rewrite serialize_parse_byte.
+    destruct (user_len p <? 0)%sint63 eqn:HUlen2.
+    ** rewrite <- HUlen in HUlen2.
+       admit.
+    ** rewrite <- HUlenStr. 
+       rewrite -> prefix_correct2.
+       rewrite HUlenStr.
+       rewrite to_nat_of_nat.
+       rewrite Uint63.eqb_refl.
+       rewrite serialize_parse_byte.
+       rewrite <- HUlenStr.
+       rewrite substring_skip.
+       subst rest14.
+       unfold parse_password.
+       destruct (password_len p <? 0)%sint63 eqn:HUpass2.
+       *** rewrite <- HUpass in HUpass2.
+           admit.
+       *** rewrite <- HUpassStr.
+           rewrite prefix_correct3.
+           rewrite HUpassStr.
+           rewrite to_nat_of_nat.
+           all: swap 1 2.
+           admit.
+           rewrite Uint63.eqb_refl.
+           rewrite <- HUpassStr.
+           replace (length (p_password p) - length (p_password p)) with 0 by lia.
+           rewrite substring_skip2.
+           repeat rewrite serialize_parse_two_byte.
+           all: swap 1 2.
+           all: swap 2 3.
+           all: swap 3 4.
+           congruence.
+           congruence.
+           congruence.
+           rewrite <- Heqip.
+           rewrite <- Hlen1.
+           rewrite <- Hlen2.
+           rewrite <- Hlen3.
+           destruct p.
+           simpl.
+           reflexivity.
+Admitted. 
+  
+

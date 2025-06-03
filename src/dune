@@ -1,12 +1,5 @@
 (include_subdirs qualified)
 
-; (executable
-;  (name server)
-;  (modules :standard)
-;  (flags
-;   (:standard -rectypes -w -26 -w -27 -w -33 -w -39))
-;  (libraries coq-core.kernel coq-core.clib coq-core.vm unix))
-
 (executables
  (names server client)
  (flags

@@ -1,6 +1,8 @@
 _build
 .vscode
 
+.lia.cache
+
 **/*.vo
 **/*.vo[ks]
 **/*.glob
