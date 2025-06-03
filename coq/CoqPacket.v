@@ -1,8 +1,10 @@
+Require Import ZArith.
 Require Import Sint63.
 Require Import String.
 Require Import Ascii.
 Require Import Definitions.
 Require Import CoqUtils.
+Require Import CoqArithUtils.
 Require Import Lia.
 
 Include Protocol.
@@ -331,7 +333,7 @@ Definition parse_line (data: string): Result (int * string) ErrorMsg :=
   end.
 
 Definition parse_username (data: string) (len: int): Ret (string * string) :=
-  if (len <? 0)%sint63 then
+  if (to_Z len <? 0)%Z then
     Error (Some "Invalid username length"%string)
   else
     let username := substring 0 (to_nat len) data in
@@ -342,7 +344,7 @@ Definition parse_username (data: string) (len: int): Ret (string * string) :=
       Error (Some "Invalid username format"%string).
 
 Definition parse_password (data: string) (len: int): Ret (string * string) :=
-  if (len <? 0)%sint63 then
+  if (to_Z len <? 0)%Z then
     Error (Some "Invalid password length"%string)
   else
     let password := substring 0 (to_nat len) data in
@@ -456,7 +458,7 @@ Definition parse_packet (data: string): Result ParsedPacket ErrorMsg :=
   end.
 
 Definition char_of_int (n: int) : ascii :=
-  Ascii.ascii_of_nat (to_nat n).
+  ascii_of_nat (Z.to_nat (to_Z n)).
 
 Definition serialize_version (vt: VersionType) : string :=
   String (ascii_of_version_type vt) "".
@@ -465,9 +467,9 @@ Definition serialize_packet_type (pt: PacketType) : string :=
   String (ascii_of_packet_type pt) "".
 
 Definition serialize_short (n: int) : string :=
-  let high := (n / 256)%sint63 in
-  let low := (n mod 256)%sint63 in
-  String (char_of_int high) (String (char_of_int low) "").
+  let high := (to_Z (n / 256)%sint63) in
+  let low := (to_Z (n mod 256)%sint63) in
+  String (ascii_of_nat (Z.to_nat high)) (String (ascii_of_nat (Z.to_nat low)) "").
 
 Definition serialize_byte (n: int) : string :=
   String (char_of_int n) "".
@@ -530,12 +532,6 @@ Definition packet_to_string (p: ParsedPacket) : string :=
   "Username: " ++ p.(p_username) ++ newline ++
   "Password: " ++ p.(p_password).
 
-Definition is_one_byte (n: int): bool :=
-  (0 <=? n <? 256)%sint63.
-
-Definition is_two_byte (n: int): bool :=
-  (0 <=? n <? 65536)%sint63.
-
 Lemma ascii_of_version_type_non_empty:
   forall vt, (String (ascii_of_version_type vt) "") <> "".
 Proof.
@@ -576,22 +572,25 @@ Qed.
 
 Lemma serialize_parse_byte:
   forall (n: int),
-    is_one_byte n = true -> of_nat (nat_of_ascii (char_of_int n)) = n.
+    is_one_byte n -> of_nat (nat_of_ascii (char_of_int n)) = n.
 Proof.
   intros.
   unfold char_of_int.
+  simpl.
 Admitted.
 
-Lemma serialize_parse_two_byte:
+(* Lemma serialize_parse_two_byte:
   forall (n: int),
-    is_two_byte n = true ->
+    is_two_byte n ->
     (256 * of_nat (nat_of_ascii (char_of_int (n / 256))) + of_nat (nat_of_ascii (char_of_int (n mod 256))))%sint63 = n.
 Proof.
-Admitted.
+  intros.
+  unfold char_of_int.
+Admitted. *)
 
-Lemma to_nat_of_nat:
+Lemma to_nat_of_nat2:
   forall (n: int),
-    (0 <=? n)%sint63 = true -> of_nat (to_nat n) = n.
+    (0 <=? to_Z n)%Z = true -> of_nat (to_nat n) = n.
 Proof.
   intros n H.
 Admitted.
@@ -601,16 +600,32 @@ Lemma prefix_correct2:
     substring 0 (String.length s) (s ++ tl) = s.
 Proof.
   intros s tl.
-  induction (length s) eqn:Hlen.
+  induction s.
   * simpl.
-Admitted.
+    destruct tl; now simpl.
+  * simpl.
+    now rewrite IHs.
+Qed.
 
 Lemma substring_skip:
   forall (s1 s2: string),
     substring (length s1) (length (s1 ++ s2) - length s1) (s1 ++ s2) = s2.
 Proof.
   intros s1 s2.
-Admitted.
+  induction s1.
+  * simpl.
+    replace (length s2 - 0) with (length s2) by lia.
+    apply prefix_correct.
+    induction s2.
+    ** now simpl.
+    ** simpl.
+       rewrite IHs2.
+       destruct (ascii_dec a a).
+       *** reflexivity.
+       *** contradiction.
+  * simpl.
+    now rewrite IHs1.
+Qed.  
 
 Lemma substring_skip2:
   forall (s1: string),
@@ -618,7 +633,7 @@ Lemma substring_skip2:
 Proof.
   intros.
   induction s1.
-  * simpl. reflexivity.
+  * now simpl.
   * simpl.
     rewrite IHs1.
     reflexivity.
@@ -631,7 +646,7 @@ Proof.
   intros s1.
   unfold prefix.
   induction s1.
-  * simpl. reflexivity.
+  * now simpl.
   * simpl.
     rewrite IHs1.
     destruct ascii_dec.
@@ -643,18 +658,23 @@ Lemma prefix_correct3:
   forall (s1: string),
     substring 0 (String.length s1) s1 = s1.
 Proof.
-Admitted.
+  intros.
+  induction s1.
+  * now simpl.
+  * simpl.
+    now rewrite IHs1.
+Qed. 
 
 Lemma serialize_parse_packet_id:
   forall (p: ParsedPacket) (s: string),
      (String.length p.(result1) = 4) ->
      (String.length p.(result2) = 4) ->
      (String.length p.(result3) = 2) ->
-     (is_one_byte p.(user_len)) = true ->
-     (is_one_byte p.(password_len)) = true ->
-     (is_two_byte p.(nonce)) = true ->
-     (is_two_byte p.(destination_port)) = true ->
-     (is_two_byte p.(line)) = true ->
+     (is_one_byte p.(user_len)) ->
+     (is_one_byte p.(password_len)) ->
+     (is_two_byte p.(nonce)) ->
+     (is_two_byte p.(destination_port)) ->
+     (is_two_byte p.(line)) ->
      (String.length (p.(p_username)) = to_nat p.(user_len)) ->
      (String.length (p.(p_password)) = to_nat p.(password_len)) ->
      s = serialize_packet p -> parse_packet s = Ok p.
@@ -796,46 +816,49 @@ Proof.
     subst rest13.
     unfold parse_username.
     rewrite serialize_parse_byte.
-    destruct (user_len p <? 0)%sint63 eqn:HUlen2.
-    ** rewrite <- HUlen in HUlen2.
-       admit.
+    all: swap 1 2.
+    congruence.
+    destruct (to_Z (user_len p) <? 0)%Z eqn:HUlen2.
+    ** generalize (is_one_byte_negative (user_len p)). intro HNeg.
+       specialize (HNeg HUlen).
+       congruence.
     ** rewrite <- HUlenStr. 
        rewrite -> prefix_correct2.
        rewrite HUlenStr.
-       rewrite to_nat_of_nat.
+       rewrite to_nat_of_nat2.
+       all: swap 1 2.
+       rewrite is_one_byte_non_negative. reflexivity. congruence.
        rewrite Uint63.eqb_refl.
        rewrite serialize_parse_byte.
+       all: swap 1 2.
+       congruence.
        rewrite <- HUlenStr.
        rewrite substring_skip.
        subst rest14.
        unfold parse_password.
-       destruct (password_len p <? 0)%sint63 eqn:HUpass2.
-       *** rewrite <- HUpass in HUpass2.
-           admit.
+       destruct (to_Z (password_len p) <? 0)%Z eqn:HUpass2.
+       ***  generalize (is_one_byte_negative (password_len p)). intro HNeg.
+            specialize (HNeg HUpass).
+            congruence.
        *** rewrite <- HUpassStr.
            rewrite prefix_correct3.
            rewrite HUpassStr.
-           rewrite to_nat_of_nat.
+           rewrite to_nat_of_nat2.
            all: swap 1 2.
-           admit.
+           rewrite is_one_byte_non_negative. reflexivity. congruence.
            rewrite Uint63.eqb_refl.
            rewrite <- HUpassStr.
            replace (length (p_password p) - length (p_password p)) with 0 by lia.
            rewrite substring_skip2.
+           admit.
+           (* rewrite split_two_bytes_eq_init by auto.
+
            repeat rewrite serialize_parse_two_byte.
-           all: swap 1 2.
-           all: swap 2 3.
-           all: swap 3 4.
-           congruence.
-           congruence.
-           congruence.
            rewrite <- Heqip.
            rewrite <- Hlen1.
            rewrite <- Hlen2.
            rewrite <- Hlen3.
            destruct p.
            simpl.
-           reflexivity.
-Admitted. 
-  
-
+           reflexivity. *)
+Admitted.
