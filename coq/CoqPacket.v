@@ -850,8 +850,12 @@ Proof.
            rewrite <- HUpassStr.
            replace (length (p_password p) - length (p_password p)) with 0 by lia.
            rewrite substring_skip2.
+           remember (
+            (256 * of_nat (nat_of_ascii (ascii_of_nat (Z.to_nat (to_Z (nonce p / 256))))) +
+of_nat (nat_of_ascii (ascii_of_nat (Z.to_nat (to_Z (nonce p mod 256))))))%sint63
+           ) as n1.
            admit.
-           (* rewrite split_two_bytes_eq_init by auto.
+           (* rewrite split_two_bytes_eq_init in n1.
 
            repeat rewrite serialize_parse_two_byte.
            rewrite <- Heqip.

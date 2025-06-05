@@ -21,6 +21,7 @@ Parameter file_descr : Set.
 Parameter sockaddr : Set.
 Parameter println : string -> bool.
 Parameter int_to_string : int -> string.
+Parameter sockaddr_to_string: sockaddr -> string.
 Parameter eq_sockaddr : sockaddr -> sockaddr -> bool.
 
 Module Protocol.
