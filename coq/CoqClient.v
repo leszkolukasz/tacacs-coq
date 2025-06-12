@@ -148,6 +148,60 @@ Definition create_slip_addr_packet (addr: IPAddress) : ParsedPacket :=
     p_password := "";
   |}.
 
+Definition create_slip_on_packet : ParsedPacket :=
+  {|
+    version := Extended;
+    kind := PacketSlipOn;
+    nonce := of_nat 2;
+    user_len := of_nat 0;
+    password_len := of_nat 0;
+    response := ResponseNone;
+    reason := ReasonNone;
+    result1 := String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0) "")));
+    destination_addr := (Ascii.ascii_of_nat 0, Ascii.ascii_of_nat 0, 
+                         Ascii.ascii_of_nat 0, Ascii.ascii_of_nat 0);
+    destination_port := of_nat 0;
+    line := of_nat 1;
+    result2 := String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0) "")));
+    result3 := String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0) "");
+    p_username := "";
+    p_password := "";
+  |}.
+
+Definition create_slip_off_packet : ParsedPacket :=
+  {|
+    version := Extended;
+    kind := PacketSlipOff;
+    nonce := of_nat 2;
+    user_len := of_nat 0;
+    password_len := of_nat 0;
+    response := ResponseNone;
+    reason := ReasonNone;
+    result1 := String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0) "")));
+    destination_addr := (Ascii.ascii_of_nat 0, Ascii.ascii_of_nat 0, 
+                         Ascii.ascii_of_nat 0, Ascii.ascii_of_nat 0);
+    destination_port := of_nat 0;
+    line := of_nat 1;
+    result2 := String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0) "")));
+    result3 := String (Ascii.ascii_of_nat 0)
+              (String (Ascii.ascii_of_nat 0) "");
+    p_username := "";
+    p_password := "";
+  |}.
+
 Definition build_and_serialize_packet (packet_type: PacketType) 
                                      (username password: string)
                                      (dest_addr: IPAddress)
@@ -158,6 +212,8 @@ Definition build_and_serialize_packet (packet_type: PacketType)
                 | PacketConnect => create_connect_packet dest_addr dest_port
                 | PacketLogout => create_logout_packet
                 | PacketSlipAddr => create_slip_addr_packet dest_addr
+                | PacketSlipOn => create_slip_on_packet
+                | PacketSlipOff => create_slip_off_packet
                 | _ => create_login_packet "" ""
                 end in
   Ok (serialize_packet packet).

@@ -131,6 +131,119 @@ class tacacs_client server_host server_port =
         self#send_and_receive PacketSlipAddr "" "" coq_ip (Uint63.of_int 0)
       in
       response
+
+    method slip_on =
+      let empty_addr = (((Char.chr 0, Char.chr 0), Char.chr 0), Char.chr 0) in
+      let response =
+        self#send_and_receive PacketSlipOn "" "" empty_addr (Uint63.of_int 0)
+      in
+      response
+
+    method slip_off =
+      let empty_addr = (((Char.chr 0, Char.chr 0), Char.chr 0), Char.chr 0) in
+      let response =
+        self#send_and_receive PacketSlipOff "" "" empty_addr (Uint63.of_int 0)
+      in
+      response
+  end
+
+class tacacs_connection host port =
+  object (self)
+    val client = new tacacs_client host port
+
+    (* Handles a standard login connection sequence *)
+    method login_connection username password =
+      (* Step 1: Send LOGIN packet *)
+      Printf.printf "Starting login connection sequence...\n";
+      Printf.printf "Step 1: Sending login request to %s:%d...\n" host port;
+      let login_response = client#login username password in
+      Printf.printf "Login response: %s (Reason: %s)\n"
+        (string_of_response_type login_response.response)
+        (string_of_reason_type login_response.reason);
+
+      if not (is_success_response login_response) then Error "Login failed"
+      else Ok login_response
+
+    (* Send CONNECT packet during an active connection *)
+    method connect_during_session ip_addr port =
+      Printf.printf "Sending connect request during active session...\n";
+      let response = client#connect_request ip_addr port in
+      Printf.printf "Connect response: %s (Reason: %s)\n"
+        (string_of_response_type response.response)
+        (string_of_reason_type response.reason);
+      if is_success_response response then Ok response
+      else Error "Connect failed"
+
+    (* End a login connection with LOGOUT *)
+    method end_connection () =
+      Printf.printf "Ending connection...\n";
+      let response = client#logout in
+      Printf.printf "Logout response: %s (Reason: %s)\n"
+        (string_of_response_type response.response)
+        (string_of_reason_type response.reason);
+      client#close_socket ();
+      if is_success_response response then Ok response
+      else Error "Logout failed"
+
+    (* Handle a complete SLIP connection sequence *)
+    method slip_connection username password slip_ip =
+      (* Step 1: LOGIN *)
+      Printf.printf "Starting SLIP connection sequence...\n";
+      Printf.printf "Step 1: Sending login request...\n";
+      let login_response = client#login username password in
+      Printf.printf "Login response: %s (Reason: %s)\n"
+        (string_of_response_type login_response.response)
+        (string_of_reason_type login_response.reason);
+
+      if not (is_success_response login_response) then
+        Error "SLIP connection failed at login step"
+      else (
+        (* Step 2: SLIPADDR *)
+        Printf.printf "Step 2: Setting SLIP address...\n";
+        let slip_addr_response = client#set_slip_address slip_ip in
+        Printf.printf "SlipAddr response: %s (Reason: %s)\n"
+          (string_of_response_type slip_addr_response.response)
+          (string_of_reason_type slip_addr_response.reason);
+
+        if not (is_success_response slip_addr_response) then
+          Error "SLIP connection failed at SLIPADDR step"
+        else (
+          (* Step 3: SLIPON *)
+          Printf.printf "Step 3: Activating SLIP mode...\n";
+          let slip_on_response = client#slip_on in
+          Printf.printf "SlipOn response: %s (Reason: %s)\n"
+            (string_of_response_type slip_on_response.response)
+            (string_of_reason_type slip_on_response.reason);
+
+          if not (is_success_response slip_on_response) then
+            Error "SLIP connection failed at SLIPON step"
+          else (
+            (* Step 4: LOGOUT (immediate) *)
+            Printf.printf "Step 4: Sending logout for SLIP session...\n";
+            let logout_response = client#logout in
+            Printf.printf "Logout response: %s (Reason: %s)\n"
+              (string_of_response_type logout_response.response)
+              (string_of_reason_type logout_response.reason);
+
+            if not (is_success_response logout_response) then
+              Error "SLIP connection failed at LOGOUT step"
+            else
+              Ok
+                ( login_response,
+                  slip_addr_response,
+                  slip_on_response,
+                  logout_response ))))
+
+    (* End SLIP session *)
+    method end_slip_session () =
+      Printf.printf "Ending SLIP session...\n";
+      let response = client#slip_off in
+      Printf.printf "SlipOff response: %s (Reason: %s)\n"
+        (string_of_response_type response.response)
+        (string_of_reason_type response.reason);
+      client#close_socket ();
+      if is_success_response response then Ok response
+      else Error "SlipOff failed"
   end
 
 let usage =
@@ -140,7 +253,11 @@ let usage =
   \  superuser <username> <password>        - Request superuser privileges\n\
   \  connect <ip_address> <port>            - Request connection to remote host\n\
   \  logout                                 - Logout from TACACS server\n\
-  \  slipaddr <ip_address>                  - Set SLIP address\n\n\
+  \  slipaddr <ip_address>                  - Set SLIP address\n\
+  \  slipon                                 - Enable SLIP mode\n\
+  \  slipoff                                - Disable SLIP mode\n\
+  \  session login <username> <password>    - Start a login connection session\n\
+  \  session slip <username> <password> <ip> - Start a SLIP connection session\n\n\
    Options:\n\
   \  -h, --host <hostname>                  - TACACS server hostname (default: \
    localhost)\n\
@@ -237,6 +354,76 @@ let main () =
       with e ->
         Printf.printf "Error: %s\n" (Printexc.to_string e);
         client#close_socket ())
+  | "slipon" :: _ -> (
+      let client = new tacacs_client !host !port in
+      try
+        Printf.printf "Sending SLIP ON request to %s:%d...\n" !host !port;
+        let response = client#slip_on in
+        Printf.printf "SlipOn response: %s (Reason: %s)\n"
+          (string_of_response_type response.response)
+          (string_of_reason_type response.reason);
+        client#close_socket ()
+      with e ->
+        Printf.printf "Error: %s\n" (Printexc.to_string e);
+        client#close_socket ())
+  | "slipoff" :: _ -> (
+      let client = new tacacs_client !host !port in
+      try
+        Printf.printf "Sending SLIP OFF request to %s:%d...\n" !host !port;
+        let response = client#slip_off in
+        Printf.printf "SlipOff response: %s (Reason: %s)\n"
+          (string_of_response_type response.response)
+          (string_of_reason_type response.reason);
+        client#close_socket ()
+      with e ->
+        Printf.printf "Error: %s\n" (Printexc.to_string e);
+        client#close_socket ())
+  | "session" :: "login" :: username :: password :: _ -> (
+      let connection = new tacacs_connection !host !port in
+      try
+        match connection#login_connection username password with
+        | Ok _ ->
+            print_endline
+              "Login successful! Type 'connect <ip> <port>' to establish \
+               connections or 'quit' to logout.";
+            let rec session_loop () =
+              Printf.printf "> ";
+              let input = read_line () in
+              match String.split_on_char ' ' input with
+              | [ "connect"; ip_str; port_str ] ->
+                  let ip_addr = ip_address_of_string ip_str in
+                  let port = int_of_string port_str in
+                  (match connection#connect_during_session ip_addr port with
+                  | Ok _ -> print_endline "Connection successful!"
+                  | Error msg -> Printf.printf "Connection failed: %s\n" msg);
+                  session_loop ()
+              | [ "quit" ] -> (
+                  match connection#end_connection () with
+                  | Ok _ -> print_endline "Session ended."
+                  | Error msg -> Printf.printf "Error ending session: %s\n" msg)
+              | _ ->
+                  print_endline
+                    "Unknown command. Use 'connect <ip> <port>' or 'quit'.";
+                  session_loop ()
+            in
+            session_loop ()
+        | Error msg -> Printf.printf "Error: %s\n" msg
+      with e -> Printf.printf "Error: %s\n" (Printexc.to_string e))
+  | "session" :: "slip" :: username :: password :: ip_str :: _ -> (
+      let connection = new tacacs_connection !host !port in
+      try
+        let slip_ip = ip_address_of_string ip_str in
+        match connection#slip_connection username password slip_ip with
+        | Ok _ -> (
+            print_endline
+              "SLIP connection established. Press Enter to terminate.";
+            let _ = read_line () in
+            match connection#end_slip_session () with
+            | Ok _ -> print_endline "SLIP session terminated."
+            | Error msg ->
+                Printf.printf "Error terminating SLIP session: %s\n" msg)
+        | Error msg -> Printf.printf "Error: %s\n" msg
+      with e -> Printf.printf "Error: %s\n" (Printexc.to_string e))
   | cmd :: _ ->
       Printf.printf "Unknown command: %s\nUse --help for usage information.\n"
         cmd
