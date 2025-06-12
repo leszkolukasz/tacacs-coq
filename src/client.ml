@@ -73,9 +73,14 @@ class tacacs_client server_host server_port =
                 let len, _ = recvfrom sock buffer 0 max_packet_size [] in
                 if len <= 0 then failwith "Empty response received";
 
+                (* Parse the received packet *)
                 let response_data = Bytes.sub_string buffer 0 len in
-                match parse_packet response_data with
+                let parsed_packet = parse_packet response_data in
+                (* Validate and handle the response packet *)
+                match parsed_packet with
                 | Ok packet -> (
+                    Printf.printf "%s" (packet_to_string packet);
+                    (* Handle the response packet *)
                     match handle_response_packet packet with
                     | Ok validated_packet -> validated_packet
                     | Error msg ->
@@ -118,10 +123,12 @@ class tacacs_client server_host server_port =
       in
       response
 
-    method logout =
+    method logout ?(username = "") ?(password = "") ?(line = 1)
+        ?(reason = ReasonQuit) () =
       let empty_addr = (((Char.chr 0, Char.chr 0), Char.chr 0), Char.chr 0) in
       let response =
-        self#send_and_receive PacketLogout "" "" empty_addr (Uint63.of_int 0)
+        self#send_and_receive PacketLogout username password empty_addr
+          (Uint63.of_int 0)
       in
       response
 
@@ -175,9 +182,10 @@ class tacacs_connection host port =
       else Error "Connect failed"
 
     (* End a login connection with LOGOUT *)
-    method end_connection () =
+    method end_connection ?(username = "") ?(password = "") ?(line = 1)
+        ?(reason = ReasonQuit) () =
       Printf.printf "Ending connection...\n";
-      let response = client#logout in
+      let response = client#logout ~username ~password ~line ~reason () in
       Printf.printf "Logout response: %s (Reason: %s)\n"
         (string_of_response_type response.response)
         (string_of_reason_type response.reason);
@@ -220,7 +228,10 @@ class tacacs_connection host port =
           else (
             (* Step 4: LOGOUT (immediate) *)
             Printf.printf "Step 4: Sending logout for SLIP session...\n";
-            let logout_response = client#logout in
+            (* For SLIP mode, pass the username but use ReasonNone reason as per RFC 1492 *)
+            let logout_response =
+              client#logout ~username ~reason:ReasonNone ()
+            in
             Printf.printf "Logout response: %s (Reason: %s)\n"
               (string_of_response_type logout_response.response)
               (string_of_reason_type logout_response.reason);
@@ -253,6 +264,7 @@ let usage =
   \  superuser <username> <password>        - Request superuser privileges\n\
   \  connect <ip_address> <port>            - Request connection to remote host\n\
   \  logout                                 - Logout from TACACS server\n\
+  \  logout <username> <password> <line>    - Logout with specific credentials\n\
   \  slipaddr <ip_address>                  - Set SLIP address\n\
   \  slipon                                 - Enable SLIP mode\n\
   \  slipoff                                - Disable SLIP mode\n\
@@ -329,11 +341,12 @@ let main () =
       with e ->
         Printf.printf "Error: %s\n" (Printexc.to_string e);
         client#close_socket ())
-  | "logout" :: _ -> (
+  | "logout" :: username :: password :: line_str :: _ -> (
       let client = new tacacs_client !host !port in
       try
         Printf.printf "Sending logout request to %s:%d...\n" !host !port;
-        let response = client#logout in
+        let line = int_of_string line_str in
+        let response = client#logout ~username ~password ~line () in
         Printf.printf "Logout response: %s (Reason: %s)\n"
           (string_of_response_type response.response)
           (string_of_reason_type response.reason);

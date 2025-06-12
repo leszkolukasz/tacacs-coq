@@ -79,8 +79,14 @@ Definition handle_slip_on (packet: ParsedPacket) (sdata: ServerData) (clnt_addr:
   | Some conn =>
       match conn.(mode) with
       | Normal =>
-          let new_conn := with_mode (Slip false) conn in (* TODO: check slip_addr *)
-          log_message "[SLIPON] OK" (fun _ => Ok (accepted_packet packet, update_connection new_conn sdata))
+          (* Check if slip_addr is set before allowing SLIPON *)
+          match conn.(slip_addr) with
+          | Some _ =>
+              let new_conn := with_mode (Slip false) conn in
+              log_message "[SLIPON] OK" (fun _ => Ok (accepted_packet packet, update_connection new_conn sdata))
+          | None => 
+              log_message "[SLIPON] No SLIP address set" (fun _ => Ok (rejected_packet packet, sdata))
+          end
       | Slip _ => log_message "[SLIPON] Already in slip mode" (fun _ => Ok (rejected_packet packet, sdata))
       end
   | None => log_message "[SLIPON] No existing connection found" (fun _ => Ok (rejected_packet packet, sdata))

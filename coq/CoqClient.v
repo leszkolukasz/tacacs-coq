@@ -95,15 +95,15 @@ Definition create_connect_packet (dest_addr: IPAddress) (dest_port: int) : Parse
     p_password := "";
   |}.
 
-Definition create_logout_packet : ParsedPacket :=
+Definition create_logout_packet (username password: string) (line_num: int) (reason: ReasonType) : ParsedPacket :=
   {|
     version := Extended;
     kind := PacketLogout;
     nonce := of_nat 2;
-    user_len := of_nat 0;
-    password_len := of_nat 0;
+    user_len := of_nat (String.length username);
+    password_len := of_nat (String.length password);
     response := ResponseNone;
-    reason := ReasonNone;
+    reason := reason;
     result1 := String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0)
@@ -111,15 +111,15 @@ Definition create_logout_packet : ParsedPacket :=
     destination_addr := (Ascii.ascii_of_nat 0, Ascii.ascii_of_nat 0, 
                          Ascii.ascii_of_nat 0, Ascii.ascii_of_nat 0);
     destination_port := of_nat 0;
-    line := of_nat 1;
+    line := line_num;
     result2 := String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0) "")));
     result3 := String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0) "");
-    p_username := "";
-    p_password := "";
+    p_username := username;
+    p_password := password;
   |}.
 
 Definition create_slip_addr_packet (addr: IPAddress) : ParsedPacket :=
@@ -210,7 +210,7 @@ Definition build_and_serialize_packet (packet_type: PacketType)
                 | PacketLogin => create_login_packet username password
                 | PacketSuperuser => create_superuser_packet username password
                 | PacketConnect => create_connect_packet dest_addr dest_port
-                | PacketLogout => create_logout_packet
+                | PacketLogout => create_logout_packet username password (of_nat 1) ReasonQuit
                 | PacketSlipAddr => create_slip_addr_packet dest_addr
                 | PacketSlipOn => create_slip_on_packet
                 | PacketSlipOff => create_slip_off_packet

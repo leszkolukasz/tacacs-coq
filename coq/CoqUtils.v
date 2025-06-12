@@ -135,13 +135,34 @@ Definition with_data (uname pwd : string) (packet: ParsedPacket) : ParsedPacket 
 		p_password := pwd;
 	|}.
 
+Definition empty_4_bytes : string :=
+	String (Ascii.ascii_of_nat 0)
+		(String (Ascii.ascii_of_nat 0)
+		(String (Ascii.ascii_of_nat 0)
+		(String (Ascii.ascii_of_nat 0) ""))).
+
+Definition empty_2_bytes : string :=
+	String (Ascii.ascii_of_nat 0)
+		(String (Ascii.ascii_of_nat 0) "").
+
+Definition empty_n_bytes (n: nat) : string :=
+	let fix helper (n: nat) (acc: string) : string :=
+		match n with
+		| 0 => acc
+		| S n' => helper n' (String (Ascii.ascii_of_nat 0) acc)
+		end
+	in helper n "".
+
+
+(* Returns a base packet which can be used to build a request packet. *)
+
 (* Returns a base packet which can be used to build a response packet. *)
 Definition prepare_reponse_packet (r: ResponseType) (packet: ParsedPacket) : ParsedPacket :=
 	packet 	|> with_packet_type PacketResponse
 					|> with_response_type r
 					|> with_reason_type (if eqb_response_type r ResponseAccepted then ReasonNone else ReasonDenied)
-					|> with_results "" "" ""
-					|> with_data "" "".
+					|> with_results empty_4_bytes empty_4_bytes empty_2_bytes 
+					|> with_data (empty_n_bytes (to_nat packet.(user_len))) (empty_n_bytes (to_nat packet.(password_len))).
 
 Definition rejected_packet (packet: ParsedPacket) : ParsedPacket :=
 	prepare_reponse_packet ResponseRejected packet.
