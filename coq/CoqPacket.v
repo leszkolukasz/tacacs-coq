@@ -570,6 +570,7 @@ Proof.
     ** simpl in H. congruence.
 Qed.
 
+
 Lemma serialize_parse_byte:
   forall (n: int),
     is_one_byte n -> of_nat (nat_of_ascii (char_of_int n)) = n.
@@ -577,22 +578,35 @@ Proof.
   intros.
   unfold char_of_int.
   simpl.
-Admitted.
+  rewrite nat_ascii_embedding.
+  - rewrite ZifyInst.of_nat_to_nat_eq.
+    unfold is_one_byte in H.
+    rewrite Z.max_r by apply H.
+    now rewrite of_to_Z.
+  - unfold is_one_byte in H. 
+    destruct H.
+    replace 256 with (Z.to_nat 256) by lia.
+    rewrite <- Z2Nat.inj_lt; lia. 
+Qed.
 
-(* Lemma serialize_parse_two_byte:
-  forall (n: int),
-    is_two_byte n ->
-    (256 * of_nat (nat_of_ascii (char_of_int (n / 256))) + of_nat (nat_of_ascii (char_of_int (n mod 256))))%sint63 = n.
-Proof.
-  intros.
-  unfold char_of_int.
-Admitted. *)
+
+(* Notation to_nat i := (Z.to_nat (to_Z i)).
+Notation of_nat n := (of_Z (Z.of_nat n)). *)
+
+(* Check Z2Nat.id. *)
+
+(* of_Z (Z.of_nat (Z.to_nat (to_Z i))) *)
 
 Lemma to_nat_of_nat2:
   forall (n: int),
     (0 <=? to_Z n)%Z = true -> of_nat (to_nat n) = n.
 Proof.
   intros n H.
+  rewrite Z2Nat.id.
+  replace (φ (n)%uint63) with (to_Z n).
+  - now rewrite of_to_Z.
+  (* - unof 
+  - apply H.   *)
 Admitted.
 
 Lemma prefix_correct2:
@@ -815,9 +829,7 @@ Proof.
     remember (p_password p) as rest14 in Heqrest13.
     subst rest13.
     unfold parse_username.
-    rewrite serialize_parse_byte.
-    all: swap 1 2.
-    congruence.
+    rewrite serialize_parse_byte by congruence.
     destruct (to_Z (user_len p) <? 0)%Z eqn:HUlen2.
     ** generalize (is_one_byte_negative (user_len p)). intro HNeg.
        specialize (HNeg HUlen).
@@ -829,9 +841,7 @@ Proof.
        all: swap 1 2.
        rewrite is_one_byte_non_negative. reflexivity. congruence.
        rewrite Uint63.eqb_refl.
-       rewrite serialize_parse_byte.
-       all: swap 1 2.
-       congruence.
+       rewrite serialize_parse_byte by congruence.
        rewrite <- HUlenStr.
        rewrite substring_skip.
        subst rest14.
@@ -850,19 +860,15 @@ Proof.
            rewrite <- HUpassStr.
            replace (length (p_password p) - length (p_password p)) with 0 by lia.
            rewrite substring_skip2.
-           remember (
-            (256 * of_nat (nat_of_ascii (ascii_of_nat (Z.to_nat (to_Z (nonce p / 256))))) +
-of_nat (nat_of_ascii (ascii_of_nat (Z.to_nat (to_Z (nonce p mod 256))))))%sint63
-           ) as n1.
-           admit.
-           (* rewrite split_two_bytes_eq_init in n1.
-
-           repeat rewrite serialize_parse_two_byte.
+           replace 256%sint63 with (of_nat 256%nat) by now compute.
+           repeat rewrite <- of_nat_mult.
+           repeat rewrite <- of_nat_plus.
+           repeat rewrite split_two_bytes_eq_init.
            rewrite <- Heqip.
            rewrite <- Hlen1.
            rewrite <- Hlen2.
            rewrite <- Hlen3.
            destruct p.
            simpl.
-           reflexivity. *)
+           reflexivity.
 Admitted.

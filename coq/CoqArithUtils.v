@@ -77,6 +77,77 @@ Proof.
     now rewrite add_assoc.
 Qed.
 
+Check mul_of_Z.
+
+Search "nat".
+
+Print cmod.
+
+Lemma of_nat_mult:
+  forall n m,
+    (Z.of_nat (n * m) < wB / 2)%Z ->
+    Int63.Uint63.of_nat (n * m)%nat = ((Int63.Uint63.of_nat n) * (Int63.Uint63.of_nat m))%uint63.
+Proof.
+  induction n.
+  * intros.
+    simpl.
+    rewrite mul_of_Z.
+    now simpl.
+  * intros.
+    replace (S n * m)%nat with (m + n * m)%nat by lia.
+    apply to_Z_inj.
+    rewrite to_Z_mul.
+    ** replace (S n) with (1 + n)%nat by lia.
+       rewrite of_nat_plus.
+       rewrite of_nat_plus.
+       *** replace (to_Z (Uint63.of_nat 1 + Uint63.of_nat n)) with ((to_Z (Uint63.of_nat 1) + to_Z (Uint63.of_nat n)))%Z.
+        ****  replace (to_Z (Uint63.of_nat 1)) with 1%Z by now cbv.
+              replace (((1 + to_Z (Uint63.of_nat n)) * to_Z (Uint63.of_nat m)))%Z with ((to_Z (Uint63.of_nat m)) + (to_Z (Uint63.of_nat n)) * (to_Z (Uint63.of_nat m)))%Z.
+              rewrite <- to_Z_mul.
+              rewrite IHn.
+              rewrite <- to_Z_add.
+
+              Search "to_Z".
+             (* rewrite to_Z_of_nat by lia.
+             rewrite cmod_small; try lia. *)
+       (* rewrite to_Z_add at 3. *)
+       (* Search "to_Z". *)
+
+    (* Search "to_Z".
+
+
+    rewrite of_nat_plus.
+    ** rewrite of_nat_succ.
+       *** Search "to_Z".
+
+       *** replace (((1 + Uint63.of_nat n) * Uint63.of_nat m)%sint63)  with ((Uint63.of_nat m + Uint63.of_nat (n * m))%sint63).
+           **** now simpl.
+           ****  
+
+    rewrite <- of_to_Z at 1.
+    rewrite mul_of_Z.
+    rewrite of_Z_spec.
+    rewrite cmod_small; try lia.
+
+
+
+    Check Nat2Z.id.
+    Search of_Z.
+    rewrite <- Nat2Z.id.
+    simpl.
+
+
+    Search to_Z.
+    replace (S n * m) with (m + n * m)%nat by lia.
+    rewrite of_nat_plus.
+    ** rewrite IHn. *)
+        (* rewrite Nmult_Sn_m.
+    rewrite of_nat_succ by lia.
+    rewrite of_nat_succ by lia.
+    rewrite IHn by lia.
+    now rewrite add_assoc. *)
+Admitted.
+
 
 Lemma of_nat_minus:
   forall n m,
