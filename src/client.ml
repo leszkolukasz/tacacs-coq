@@ -125,6 +125,7 @@ class tacacs_client server_host server_port =
 
     method logout ?(username = "") ?(password = "") ?(line = 1)
         ?(reason = ReasonQuit) () =
+      (* For LOGOUT, the reason field should be set according to RFC 1492 section 2.2 *)
       let empty_addr = (((Char.chr 0, Char.chr 0), Char.chr 0), Char.chr 0) in
       let response =
         self#send_and_receive PacketLogout username password empty_addr
@@ -139,17 +140,26 @@ class tacacs_client server_host server_port =
       in
       response
 
+    (* Store IP address for SLIP session *)
+    val mutable slip_ip_address =
+      (((Char.chr 0, Char.chr 0), Char.chr 0), Char.chr 0)
+
+    method set_slip_ip (ip_addr : int * int * int * int) =
+      slip_ip_address <- ocaml_ip_to_coq_ip ip_addr
+
     method slip_on =
-      let empty_addr = (((Char.chr 0, Char.chr 0), Char.chr 0), Char.chr 0) in
+      (* For SLIPON, set destination address to the IP address as per RFC 1492 section 2.2 *)
       let response =
-        self#send_and_receive PacketSlipOn "" "" empty_addr (Uint63.of_int 0)
+        self#send_and_receive PacketSlipOn "" "" slip_ip_address
+          (Uint63.of_int 0)
       in
       response
 
     method slip_off =
-      let empty_addr = (((Char.chr 0, Char.chr 0), Char.chr 0), Char.chr 0) in
+      (* For SLIPOFF, set destination address to the IP address and reason to REASONNONE as per RFC 1492 section 2.2 *)
       let response =
-        self#send_and_receive PacketSlipOff "" "" empty_addr (Uint63.of_int 0)
+        self#send_and_receive PacketSlipOff "" "" slip_ip_address
+          (Uint63.of_int 0)
       in
       response
   end
@@ -170,6 +180,16 @@ class tacacs_connection host port =
 
       if not (is_success_response login_response) then Error "Login failed"
       else Ok login_response
+
+    (* Request superuser privileges during an active session *)
+    method superuser_during_session username password =
+      Printf.printf "Sending superuser request during active session...\n";
+      let response = client#superuser username password in
+      Printf.printf "Superuser response: %s (Reason: %s)\n"
+        (string_of_response_type response.response)
+        (string_of_reason_type response.reason);
+      if is_success_response response then Ok response
+      else Error "Superuser request failed"
 
     (* Send CONNECT packet during an active connection *)
     method connect_during_session ip_addr port =
@@ -193,7 +213,7 @@ class tacacs_connection host port =
       if is_success_response response then Ok response
       else Error "Logout failed"
 
-    (* Handle a complete SLIP connection sequence *)
+    (* Handle a complete SLIP connection sequence with optional CONNECT or SUPERUSER requests *)
     method slip_connection username password slip_ip =
       (* Step 1: LOGIN *)
       Printf.printf "Starting SLIP connection sequence...\n";
@@ -205,45 +225,139 @@ class tacacs_connection host port =
 
       if not (is_success_response login_response) then
         Error "SLIP connection failed at login step"
-      else (
-        (* Step 2: SLIPADDR *)
-        Printf.printf "Step 2: Setting SLIP address...\n";
-        let slip_addr_response = client#set_slip_address slip_ip in
-        Printf.printf "SlipAddr response: %s (Reason: %s)\n"
-          (string_of_response_type slip_addr_response.response)
-          (string_of_reason_type slip_addr_response.reason);
+      else
+        (* Keep track of state with a single loop *)
+        let slipaddr_sent = ref false in
+        let slip_addr_response = ref None in
 
-        if not (is_success_response slip_addr_response) then
-          Error "SLIP connection failed at SLIPADDR step"
-        else (
-          (* Step 3: SLIPON *)
-          Printf.printf "Step 3: Activating SLIP mode...\n";
-          let slip_on_response = client#slip_on in
-          Printf.printf "SlipOn response: %s (Reason: %s)\n"
-            (string_of_response_type slip_on_response.response)
-            (string_of_reason_type slip_on_response.reason);
+        print_endline
+          "Login successful! You're now in SLIP connection mode.\n\
+           Enter 'connect <ip> <port>' to establish connections,\n\
+           'superuser <username> <password>' for privileges,\n\
+           'slipaddr' to set the SLIP address, and\n\
+           'quit' to terminate the session.";
 
-          if not (is_success_response slip_on_response) then
-            Error "SLIP connection failed at SLIPON step"
-          else (
-            (* Step 4: LOGOUT (immediate) *)
-            Printf.printf "Step 4: Sending logout for SLIP session...\n";
-            (* For SLIP mode, pass the username but use ReasonNone reason as per RFC 1492 *)
-            let logout_response =
-              client#logout ~username ~reason:ReasonNone ()
-            in
-            Printf.printf "Logout response: %s (Reason: %s)\n"
-              (string_of_response_type logout_response.response)
-              (string_of_reason_type logout_response.reason);
+        (* Single interactive loop with state tracking *)
+        let rec slip_loop () =
+          (* Display appropriate prompt based on state *)
+          Printf.printf "[%s]> "
+            (if !slipaddr_sent then "post-SLIPADDR" else "pre-SLIP");
+          let input = read_line () in
+          match String.split_on_char ' ' input with
+          | [ "help" ] ->
+              if !slipaddr_sent then
+                print_endline
+                  "Available commands:\n\
+                   - connect <ip> <port> : Establish a connection\n\
+                   - superuser <username> <password> : Request superuser \
+                   privileges\n\
+                   - quit : Complete the SLIP connection and terminate session\n\
+                   - help : Show this help message"
+              else
+                print_endline
+                  "Available commands:\n\
+                   - connect <ip> <port> : Establish a connection\n\
+                   - superuser <username> <password> : Request superuser \
+                   privileges\n\
+                   - slipaddr : Set SLIP address\n\
+                   - quit : Terminate session\n\
+                   - help : Show this help message";
+              slip_loop ()
+          | [ "slipaddr" ] when not !slipaddr_sent ->
+              (* Set SLIP address - can only be done once *)
+              (* Printf.printf "Setting SLIP address to %s...\n"
+                (String.concat "."
+                   (List.map string_of_int
+                      [
+                        fst (fst (fst slip_ip));
+                        snd (fst (fst slip_ip));
+                        snd (fst slip_ip);
+                        snd slip_ip;
+                      ])); *)
+              let response = client#set_slip_address slip_ip in
+              Printf.printf "SlipAddr response: %s (Reason: %s)\n"
+                (string_of_response_type response.response)
+                (string_of_reason_type response.reason);
 
-            if not (is_success_response logout_response) then
-              Error "SLIP connection failed at LOGOUT step"
-            else
-              Ok
-                ( login_response,
-                  slip_addr_response,
-                  slip_on_response,
-                  logout_response ))))
+              if not (is_success_response response) then
+                Error "SLIP connection failed at SLIPADDR step"
+              else (
+                (* Store the IP address for later use in SLIPON and SLIPOFF as per RFC 1492 section 2.2 *)
+                client#set_slip_ip slip_ip;
+                slipaddr_sent := true;
+                slip_addr_response := Some response;
+                print_endline
+                  "SLIP address set successfully! You can now send connect \
+                   requests,\n\
+                   request superuser privileges, or use 'quit' to complete the \
+                   SLIP connection.";
+                slip_loop ())
+          | [ "slipaddr" ] when !slipaddr_sent ->
+              (* Can't send SLIPADDR twice *)
+              Printf.printf
+                "Error: SLIPADDR has already been sent. You cannot send it \
+                 again.\n";
+              slip_loop ()
+          | [ "connect"; ip_str; port_str ] -> (
+              try
+                let ip_addr = ip_address_of_string ip_str in
+                let port = int_of_string port_str in
+                let response = client#connect_request ip_addr port in
+                Printf.printf "Connect response: %s (Reason: %s)\n"
+                  (string_of_response_type response.response)
+                  (string_of_reason_type response.reason);
+                slip_loop ()
+              with _ ->
+                Printf.printf "Invalid format. Expected: connect IP PORT\n";
+                slip_loop ())
+          | [ "superuser"; super_username; super_password ] ->
+              let response = client#superuser super_username super_password in
+              Printf.printf "Superuser response: %s (Reason: %s)\n"
+                (string_of_response_type response.response)
+                (string_of_reason_type response.reason);
+              slip_loop ()
+          | [ "quit" ] when !slipaddr_sent ->
+              (* Complete the SLIP connection sequence with SLIPON, LOGOUT when SLIPADDR has been sent *)
+              Printf.printf "Completing SLIP connection sequence...\n";
+              Printf.printf "Step 1: Activating SLIP mode with SLIPON...\n";
+              let slip_on_response = client#slip_on in
+              Printf.printf "SlipOn response: %s (Reason: %s)\n"
+                (string_of_response_type slip_on_response.response)
+                (string_of_reason_type slip_on_response.reason);
+
+              if not (is_success_response slip_on_response) then
+                Error "SLIP connection failed at SLIPON step"
+              else (
+                Printf.printf "Step 2: Sending LOGOUT for SLIP session...\n";
+                (* For SLIP mode, pass the username but use ReasonNone reason as per RFC 1492 section 2.2 *)
+                let logout_response =
+                  client#logout ~username ~reason:ReasonNone ()
+                in
+                Printf.printf "Logout response: %s (Reason: %s)\n"
+                  (string_of_response_type logout_response.response)
+                  (string_of_reason_type logout_response.reason);
+
+                if not (is_success_response logout_response) then
+                  Error "SLIP connection failed at LOGOUT step"
+                else
+                  Ok
+                    ( login_response,
+                      (match !slip_addr_response with
+                      | Some r -> r
+                      | None ->
+                          failwith "Unexpected state: missing SLIPADDR response"),
+                      slip_on_response,
+                      logout_response ))
+          | [ "quit" ] when not !slipaddr_sent ->
+              (* Just terminate if SLIPADDR has not been sent *)
+              Error "SLIP connection terminated before SLIPADDR was sent."
+          | _ ->
+              Printf.printf
+                "Unknown command. Type 'help' for available commands.\n";
+              slip_loop ()
+        in
+
+        slip_loop ()
 
     (* End SLIP session *)
     method end_slip_session () =
@@ -268,8 +382,12 @@ let usage =
   \  slipaddr <ip_address>                  - Set SLIP address\n\
   \  slipon                                 - Enable SLIP mode\n\
   \  slipoff                                - Disable SLIP mode\n\
-  \  session login <username> <password>    - Start a login connection session\n\
-  \  session slip <username> <password> <ip> - Start a SLIP connection session\n\n\
+  \  session login <username> <password>    - Start interactive login \
+   connection session\n\
+  \  session slip <username> <password> <ip> - Start SLIP connection sequence \
+   with\n\
+  \                                           optional CONNECT/SUPERUSER \
+   packets\n\n\
    Options:\n\
   \  -h, --host <hostname>                  - TACACS server hostname (default: \
    localhost)\n\
@@ -398,7 +516,8 @@ let main () =
         | Ok _ ->
             print_endline
               "Login successful! Type 'connect <ip> <port>' to establish \
-               connections or 'quit' to logout.";
+               connections, 'superuser <username> <password>' for privileges, \
+               or 'quit' to logout.";
             let rec session_loop () =
               Printf.printf "> ";
               let input = read_line () in
@@ -410,13 +529,22 @@ let main () =
                   | Ok _ -> print_endline "Connection successful!"
                   | Error msg -> Printf.printf "Connection failed: %s\n" msg);
                   session_loop ()
+              | [ "superuser"; username; password ] ->
+                  (match
+                     connection#superuser_during_session username password
+                   with
+                  | Ok _ -> print_endline "Superuser privileges granted!"
+                  | Error msg ->
+                      Printf.printf "Superuser request failed: %s\n" msg);
+                  session_loop ()
               | [ "quit" ] -> (
                   match connection#end_connection () with
                   | Ok _ -> print_endline "Session ended."
                   | Error msg -> Printf.printf "Error ending session: %s\n" msg)
               | _ ->
                   print_endline
-                    "Unknown command. Use 'connect <ip> <port>' or 'quit'.";
+                    "Unknown command. Use 'connect <ip> <port>', 'superuser \
+                     <username> <password>' or 'quit'.";
                   session_loop ()
             in
             session_loop ()
@@ -427,32 +555,20 @@ let main () =
       try
         let slip_ip = ip_address_of_string ip_str in
         match connection#slip_connection username password slip_ip with
-        | Ok _ ->
+        | Ok
+            ( login_response,
+              slip_addr_response,
+              slip_on_response,
+              logout_response ) -> (
+            print_endline "SLIP connection established and LOGOUT packet sent.";
             print_endline
-              "SLIP connection established. Type 'connect <ip> <port>' to \
-               establish connections or 'quit' to terminate.";
+              "Press Enter to send SLIPOFF and terminate the session.";
+            let _ = read_line () in
 
-            let rec session_loop () =
-              Printf.printf "> ";
-              let input = read_line () in
-              match String.split_on_char ' ' input with
-              | [ "connect"; ip_str; port_str ] ->
-                  let ip_addr = ip_address_of_string ip_str in
-                  let port = int_of_string port_str in
-                  (match connection#connect_during_session ip_addr port with
-                  | Ok _ -> print_endline "Connection successful!"
-                  | Error msg -> Printf.printf "Connection failed: %s\n" msg);
-                  session_loop ()
-              | [ "quit" ] -> (
-                  match connection#end_slip_session () with
-                  | Ok _ -> print_endline "SLIP session terminated."
-                  | Error msg -> Printf.printf "Error ending session: %s\n" msg)
-              | _ ->
-                  print_endline
-                    "Unknown command. Use 'connect <ip> <port>' or 'quit'.";
-                  session_loop ()
-            in
-            session_loop ()
+            match connection#end_slip_session () with
+            | Ok _ -> print_endline "SLIP session terminated successfully."
+            | Error msg ->
+                Printf.printf "Error terminating SLIP session: %s\n" msg)
         | Error msg -> Printf.printf "Error: %s\n" msg
       with e -> Printf.printf "Error: %s\n" (Printexc.to_string e))
   | cmd :: _ ->

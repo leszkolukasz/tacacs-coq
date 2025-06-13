@@ -148,7 +148,7 @@ Definition create_slip_addr_packet (addr: IPAddress) : ParsedPacket :=
     p_password := "";
   |}.
 
-Definition create_slip_on_packet : ParsedPacket :=
+Definition create_slip_on_packet (addr: IPAddress) : ParsedPacket :=
   {|
     version := Extended;
     kind := PacketSlipOn;
@@ -161,8 +161,7 @@ Definition create_slip_on_packet : ParsedPacket :=
               (String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0) "")));
-    destination_addr := (Ascii.ascii_of_nat 0, Ascii.ascii_of_nat 0, 
-                         Ascii.ascii_of_nat 0, Ascii.ascii_of_nat 0);
+    destination_addr := addr;
     destination_port := of_nat 0;
     line := of_nat 1;
     result2 := String (Ascii.ascii_of_nat 0)
@@ -175,7 +174,7 @@ Definition create_slip_on_packet : ParsedPacket :=
     p_password := "";
   |}.
 
-Definition create_slip_off_packet : ParsedPacket :=
+Definition create_slip_off_packet (addr: IPAddress): ParsedPacket :=
   {|
     version := Extended;
     kind := PacketSlipOff;
@@ -183,13 +182,12 @@ Definition create_slip_off_packet : ParsedPacket :=
     user_len := of_nat 0;
     password_len := of_nat 0;
     response := ResponseNone;
-    reason := ReasonNone;
+    reason := ReasonQuit;
     result1 := String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0)
               (String (Ascii.ascii_of_nat 0) "")));
-    destination_addr := (Ascii.ascii_of_nat 0, Ascii.ascii_of_nat 0, 
-                         Ascii.ascii_of_nat 0, Ascii.ascii_of_nat 0);
+    destination_addr := addr;
     destination_port := of_nat 0;
     line := of_nat 1;
     result2 := String (Ascii.ascii_of_nat 0)
@@ -212,8 +210,8 @@ Definition build_and_serialize_packet (packet_type: PacketType)
                 | PacketConnect => create_connect_packet dest_addr dest_port
                 | PacketLogout => create_logout_packet username password (of_nat 1) ReasonQuit
                 | PacketSlipAddr => create_slip_addr_packet dest_addr
-                | PacketSlipOn => create_slip_on_packet
-                | PacketSlipOff => create_slip_off_packet
+                | PacketSlipOn => create_slip_on_packet dest_addr
+                | PacketSlipOff => create_slip_off_packet dest_addr
                 | _ => create_login_packet "" ""
                 end in
   Ok (serialize_packet packet).
