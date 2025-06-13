@@ -427,14 +427,32 @@ let main () =
       try
         let slip_ip = ip_address_of_string ip_str in
         match connection#slip_connection username password slip_ip with
-        | Ok _ -> (
+        | Ok _ ->
             print_endline
-              "SLIP connection established. Press Enter to terminate.";
-            let _ = read_line () in
-            match connection#end_slip_session () with
-            | Ok _ -> print_endline "SLIP session terminated."
-            | Error msg ->
-                Printf.printf "Error terminating SLIP session: %s\n" msg)
+              "SLIP connection established. Type 'connect <ip> <port>' to \
+               establish connections or 'quit' to terminate.";
+
+            let rec session_loop () =
+              Printf.printf "> ";
+              let input = read_line () in
+              match String.split_on_char ' ' input with
+              | [ "connect"; ip_str; port_str ] ->
+                  let ip_addr = ip_address_of_string ip_str in
+                  let port = int_of_string port_str in
+                  (match connection#connect_during_session ip_addr port with
+                  | Ok _ -> print_endline "Connection successful!"
+                  | Error msg -> Printf.printf "Connection failed: %s\n" msg);
+                  session_loop ()
+              | [ "quit" ] -> (
+                  match connection#end_slip_session () with
+                  | Ok _ -> print_endline "SLIP session terminated."
+                  | Error msg -> Printf.printf "Error ending session: %s\n" msg)
+              | _ ->
+                  print_endline
+                    "Unknown command. Use 'connect <ip> <port>' or 'quit'.";
+                  session_loop ()
+            in
+            session_loop ()
         | Error msg -> Printf.printf "Error: %s\n" msg
       with e -> Printf.printf "Error: %s\n" (Printexc.to_string e))
   | cmd :: _ ->
