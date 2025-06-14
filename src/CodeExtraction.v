@@ -6,7 +6,7 @@ Require Export Extracted.CoqServer.
 Require Export Extracted.CoqDatabase.
 Require Export Extracted.CoqUtils.
 Require Export Extracted.CoqClient.
-Require Export Extracted.CoqArithUtils.
+Require Export Extracted.CoqLemmas.
 
 Require ExtrOcamlBasic.
 Require ExtrOCamlInt63.
@@ -38,16 +38,13 @@ fun addr ->
       Printf.sprintf ""ADDR_UNIX: %s\n%!"" path
 ".
 
-(* Extraction Inline Definitions.println. *)
 Extract Constant Definitions.int_to_string => "fun i -> string_of_int (Uint63.hash i)".
-(* Extraction Inline Definitions.int_to_string. *)
 Extract Constant Definitions.eq_sockaddr => "(fun x y -> x = y)".
-(* Extraction Inline Definitions.eq_sockaddr. *)
 
 Recursive Extraction Library CoqUtils.
 Recursive Extraction Library CoqPacket.
 Recursive Extraction Library CoqServer.
 Recursive Extraction Library CoqClient.
 Recursive Extraction Library CoqDatabase.
-Recursive Extraction Library CoqArithUtils.
+Recursive Extraction Library CoqLemmas.
 Recursive Extraction Library Definitions.

@@ -14,7 +14,7 @@
   CoqServer
   CoqDatabase
   CoqUtils
-  CoqArithUtils
+  CoqLemmas
   Definitions
   Ascii
   BinNat

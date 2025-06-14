@@ -1,13 +1,3 @@
-(** The Coq module [ArithUtils] contains arithmetic related lemmas
-    that help in proving the properties of interest in the formalization.
-
-    - @author Anonymized
-    - @author Anonymized
-    - @author Anonymized
-    - @author Anonymized
-
-*)
-
 Require Import ZArith.
 Require Import Lia.
 Require Import Int63.Sint63.
@@ -15,6 +5,7 @@ Require Import Ascii String Coq.Strings.Byte.
 Require Import Lists.List.
 Import ListNotations.
 
+Open Scope string_scope.
 
 Lemma to_Z_of_nat:
   forall (n:nat),
@@ -26,9 +17,6 @@ Proof.
   rewrite cmod_small;  lia.
 Qed.
 
-
-
-  
 Lemma of_nat_succ:
   forall n,
     (Z.of_nat (S n) < wB / 2)%Z ->
@@ -77,15 +65,9 @@ Proof.
     now rewrite add_assoc.
 Qed.
 
-Check mul_of_Z.
-
-Search "nat".
-
-Print cmod.
-
 Lemma of_nat_mult:
   forall n m,
-    (Z.of_nat (n * m) < wB / 2)%Z ->
+    (Z.of_nat (m + n * m) < wB / 2)%Z ->
     Int63.Uint63.of_nat (n * m)%nat = ((Int63.Uint63.of_nat n) * (Int63.Uint63.of_nat m))%uint63.
 Proof.
   induction n.
@@ -97,57 +79,32 @@ Proof.
     replace (S n * m)%nat with (m + n * m)%nat by lia.
     apply to_Z_inj.
     rewrite to_Z_mul.
-    ** replace (S n) with (1 + n)%nat by lia.
-       rewrite of_nat_plus.
-       rewrite of_nat_plus.
-       *** replace (to_Z (Uint63.of_nat 1 + Uint63.of_nat n)) with ((to_Z (Uint63.of_nat 1) + to_Z (Uint63.of_nat n)))%Z.
-        ****  replace (to_Z (Uint63.of_nat 1)) with 1%Z by now cbv.
-              replace (((1 + to_Z (Uint63.of_nat n)) * to_Z (Uint63.of_nat m)))%Z with ((to_Z (Uint63.of_nat m)) + (to_Z (Uint63.of_nat n)) * (to_Z (Uint63.of_nat m)))%Z.
-              rewrite <- to_Z_mul.
-              rewrite IHn.
-              rewrite <- to_Z_add.
-
-              Search "to_Z".
-             (* rewrite to_Z_of_nat by lia.
-             rewrite cmod_small; try lia. *)
-       (* rewrite to_Z_add at 3. *)
-       (* Search "to_Z". *)
-
-    (* Search "to_Z".
-
-
+    all: swap 1 2. admit.
+    replace (S n) with (1 + n)%nat by lia.
     rewrite of_nat_plus.
-    ** rewrite of_nat_succ.
-       *** Search "to_Z".
-
-       *** replace (((1 + Uint63.of_nat n) * Uint63.of_nat m)%sint63)  with ((Uint63.of_nat m + Uint63.of_nat (n * m))%sint63).
-           **** now simpl.
-           ****  
-
-    rewrite <- of_to_Z at 1.
-    rewrite mul_of_Z.
-    rewrite of_Z_spec.
-    rewrite cmod_small; try lia.
-
-
-
-    Check Nat2Z.id.
-    Search of_Z.
-    rewrite <- Nat2Z.id.
-    simpl.
-
-
-    Search to_Z.
-    replace (S n * m) with (m + n * m)%nat by lia.
+    all: swap 1 2. lia.
     rewrite of_nat_plus.
-    ** rewrite IHn. *)
-        (* rewrite Nmult_Sn_m.
-    rewrite of_nat_succ by lia.
-    rewrite of_nat_succ by lia.
-    rewrite IHn by lia.
-    now rewrite add_assoc. *)
+    all: swap 1 2. admit.
+    replace (to_Z (Uint63.of_nat 1 + Uint63.of_nat n)) with ((to_Z (Uint63.of_nat 1) + to_Z (Uint63.of_nat n)))%Z.
+    **  replace (to_Z (Uint63.of_nat 1)) with 1%Z by now cbv.
+        replace (((1 + to_Z (Uint63.of_nat n)) * to_Z (Uint63.of_nat m)))%Z with ((to_Z (Uint63.of_nat m)) + (to_Z (Uint63.of_nat n)) * (to_Z (Uint63.of_nat m)))%Z.
+        *** rewrite <- to_Z_mul.
+            rewrite IHn.
+            rewrite <- to_Z_add.
+            now simpl.
+            pose proof Zle_0_nat.
+            specialize H0 with (m + S n * m).
+            rewrite to_Z_mul.
+            repeat rewrite to_Z_of_nat.
+            admit.
+            admit.
+            admit.
+            admit.
+            lia.
+            admit.
+        *** rewrite Z.mul_add_distr_r.
+            now replace (1 * to_Z (Uint63.of_nat m))%Z with (to_Z (Uint63.of_nat m))%Z by lia.
 Admitted.
-
 
 Lemma of_nat_minus:
   forall n m,
@@ -260,13 +217,6 @@ Proof.
   now apply Z.ltb_ge.
 Qed.
 
-(** Create a one byte out of an integer [no] in the range 0..255.
-
- It should not be used for integers outside the range. *)
-
-(** Create a two bytes out of an integer [no] in the range 0..65535.
-
- It should not be used for integers outside the range. *)
 Definition two_byte_of_int (no:int) :=
   let hibyte := (to_Z (no / 256%uint63))%Z in
   let lobyte := (to_Z (no mod 256%uint63))%Z in
@@ -274,7 +224,6 @@ Definition two_byte_of_int (no:int) :=
   then (string_of_list_ascii ["000"%char; "000"%char])
   else (string_of_list_ascii [(ascii_of_nat (Z.to_nat hibyte));
                               (ascii_of_nat (Z.to_nat lobyte))]).
-
 
 Lemma is_two_byte_leq256:
   forall no,
@@ -527,3 +476,191 @@ Proof.
     replace 256 with (Z.to_nat 256) by now compute.
     lia.
 Qed.
+
+Lemma of_nat_to_nat_small:
+  forall (i:int),
+    (0 <= to_Z i < to_Z max_int)%Z ->
+    (i = Uint63.of_nat (Uint63.to_nat i)).
+Proof.
+  intros.
+  unfold Uint63.to_nat.
+  replace (to_Z max_int) with  4611686018427387903%Z in H by now compute.  
+  destruct (φ (i)%uint63) eqn:po;simpl. 
+  * rewrite <- to_Z_mod_Uint63to_Z in po.
+    rewrite Z.mod_small in po;
+    [idtac|replace wB with 9223372036854775808%Z by (compute;lia); lia].
+    replace 0%Z with (to_Z 0%sint63) in po by now simpl.
+    apply to_Z_inj in po.
+    trivial.
+  * rewrite <- to_Z_mod_Uint63to_Z in po.
+    rewrite Z.mod_small in po;
+      [idtac|replace wB with 9223372036854775808%Z by (compute;lia); lia].
+    apply to_Z_inj.
+    rewrite <- Z2Nat.inj_pos.
+    rewrite <- po.
+    rewrite Z2Nat.id; try lia.
+    now rewrite of_to_Z.
+  * rewrite <- to_Z_mod_Uint63to_Z in po.
+    assert (0 <= (to_Z i mod wB)%Z)%Z by
+      (apply Z_mod_nonneg_nonneg;[tauto|compute;congruence]).
+    lia.
+Qed.
+
+
+Lemma of_nat_to_nat_Z_small:
+  forall (i:int),
+    (to_Z 0 <= to_Z i < to_Z max_int)%Z  -> (Z.of_nat (Uint63.to_nat i) = to_Z i).
+Proof.
+  intros i R.
+  unfold Uint63.to_nat.
+  replace (to_Z max_int) with  4611686018427387903%Z in R by now compute.
+  replace (to_Z 0) with 0%Z in R by now compute.
+  destruct (φ (i)%uint63) eqn:po;simpl.
+  * rewrite <- to_Z_mod_Uint63to_Z in po. 
+    rewrite Z.mod_small in po; 
+      replace wB with 9223372036854775808%Z by (compute;lia);lia.
+  * rewrite <- to_Z_mod_Uint63to_Z in po.
+    rewrite Z.mod_small in po;
+      [idtac|replace wB with 9223372036854775808%Z by (compute;lia); lia].
+    rewrite <- Z2Nat.inj_pos.
+    rewrite <- po.
+    rewrite Z2Nat.id; try lia.
+  * rewrite <- to_Z_mod_Uint63to_Z in po.
+    assert (0 <= (to_Z i mod wB)%Z)%Z by
+      (apply Z_mod_nonneg_nonneg;[tauto|compute;congruence]).
+    lia.
+Qed.
+
+Lemma to_nat_of_nat:
+  forall n,
+    (0 <= Z.of_nat n < 2 ^ φ (digits)%uint63)%Z ->
+    (Z.to_nat
+       (Uint63.to_Z
+          (Int63.Uint63.of_nat n))) = n.
+Proof.
+  intros.
+  rewrite <- Uint63.is_int; auto; try now rewrite Nat2Z.id.
+Qed.
+
+Lemma of_nat_to_nat:
+  forall (i:int),  (0 <= φ (i)%uint63)%Z ->  i = Uint63.of_nat (Uint63.to_nat i).
+Proof.
+  intros.
+  rewrite ZifyInst.of_nat_to_nat_eq.
+  rewrite Z.max_r;auto.
+  now rewrite Uint63.of_to_Z.
+Qed.
+
+Lemma of_nat_to_nat2:
+  forall (n: int),
+    (0 <=? to_Z n)%Z = true -> Uint63.of_nat (Uint63.to_nat n) = n.
+Proof.
+  intros n H.
+  rewrite <- of_nat_to_nat.
+  * now simpl.
+  * apply Z.leb_le in H.
+    unfold to_Z in H.
+    (* now apply H. *)
+Admitted.
+
+
+Lemma string_len_4:
+  forall s,
+  String.length s = 4 -> exists b1 b2 b3 b4, s = String b1 (String b2 (String b3 (String b4 ""))).
+Proof.
+  intros.
+  destruct s as [|b1 [|b2 [|b3 [|b4 tl]]]].
+  * simpl in H. congruence.
+  * simpl in H. congruence.
+  * simpl in H. congruence.
+  * simpl in H. congruence.
+  * exists b1, b2, b3, b4.
+    destruct tl.
+    ** reflexivity.
+    ** simpl in H. congruence.
+Qed.  
+
+
+Lemma string_len_2:
+  forall s,
+  String.length s = 2 -> exists b1 b2, s = String b1 (String b2 "").
+Proof.
+  intros.
+  destruct s as [|b1 [|b2 tl]].
+  * simpl in H. congruence.
+  * simpl in H. congruence.
+  * exists b1, b2.
+    destruct tl.
+    ** reflexivity.
+    ** simpl in H. congruence.
+Qed.
+
+Lemma prefix_correct2:
+  forall (s: string) (tl: string),
+    substring 0 (String.length s) (s ++ tl) = s.
+Proof.
+  intros s tl.
+  induction s.
+  * simpl.
+    destruct tl; now simpl.
+  * simpl.
+    now rewrite IHs.
+Qed.
+
+Lemma substring_skip:
+  forall (s1 s2: string),
+    substring (String.length s1) (String.length (s1 ++ s2) - String.length s1) (s1 ++ s2) = s2.
+Proof.
+  intros s1 s2.
+  induction s1.
+  * simpl.
+    replace (String.length s2 - 0) with (String.length s2) by lia.
+    apply prefix_correct.
+    induction s2.
+    ** now simpl.
+    ** simpl.
+       rewrite IHs2.
+       destruct (Ascii.ascii_dec a a).
+       *** reflexivity.
+       *** contradiction.
+  * simpl.
+    now rewrite IHs1.
+Qed.  
+
+Lemma substring_skip2:
+  forall (s1: string),
+    substring (String.length s1) 0 s1 = "".
+Proof.
+  intros.
+  induction s1.
+  * now simpl.
+  * simpl.
+    rewrite IHs1.
+    reflexivity.
+Qed. 
+
+Lemma prefix_eq:
+  forall (s1: string),
+    prefix s1 s1 = true.
+Proof.
+  intros s1.
+  unfold prefix.
+  induction s1.
+  * now simpl.
+  * simpl.
+    rewrite IHs1.
+    destruct Ascii.ascii_dec.
+    ** reflexivity.
+    ** contradiction.
+Qed.
+
+Lemma prefix_correct3:
+  forall (s1: string),
+    substring 0 (String.length s1) s1 = s1.
+Proof.
+  intros.
+  induction s1.
+  * now simpl.
+  * simpl.
+    now rewrite IHs1.
+Qed. 

@@ -1,10 +1,10 @@
 Require Import ZArith.
-Require Import Sint63.
+Require Import Int63.Sint63.
 Require Import String.
 Require Import Ascii.
 Require Import Definitions.
 Require Import CoqUtils.
-Require Import CoqArithUtils.
+Require Import CoqLemmas.
 Require Import Lia.
 
 Include Protocol.
@@ -539,38 +539,6 @@ Proof.
   destruct vt; congruence.
 Qed.
 
-Lemma string_len_4:
-  forall s,
-  String.length s = 4 -> exists b1 b2 b3 b4, s = String b1 (String b2 (String b3 (String b4 ""))).
-Proof.
-  intros.
-  destruct s as [|b1 [|b2 [|b3 [|b4 tl]]]].
-  * simpl in H. congruence.
-  * simpl in H. congruence.
-  * simpl in H. congruence.
-  * simpl in H. congruence.
-  * exists b1, b2, b3, b4.
-    destruct tl.
-    ** reflexivity.
-    ** simpl in H. congruence.
-Qed.  
-
-
-Lemma string_len_2:
-  forall s,
-  String.length s = 2 -> exists b1 b2, s = String b1 (String b2 "").
-Proof.
-  intros.
-  destruct s as [|b1 [|b2 tl]].
-  * simpl in H. congruence.
-  * simpl in H. congruence.
-  * exists b1, b2.
-    destruct tl.
-    ** reflexivity.
-    ** simpl in H. congruence.
-Qed.
-
-
 Lemma serialize_parse_byte:
   forall (n: int),
     is_one_byte n -> of_nat (nat_of_ascii (char_of_int n)) = n.
@@ -588,96 +556,6 @@ Proof.
     replace 256 with (Z.to_nat 256) by lia.
     rewrite <- Z2Nat.inj_lt; lia. 
 Qed.
-
-
-(* Notation to_nat i := (Z.to_nat (to_Z i)).
-Notation of_nat n := (of_Z (Z.of_nat n)). *)
-
-(* Check Z2Nat.id. *)
-
-(* of_Z (Z.of_nat (Z.to_nat (to_Z i))) *)
-
-Lemma to_nat_of_nat2:
-  forall (n: int),
-    (0 <=? to_Z n)%Z = true -> of_nat (to_nat n) = n.
-Proof.
-  intros n H.
-  rewrite Z2Nat.id.
-  replace (φ (n)%uint63) with (to_Z n).
-  - now rewrite of_to_Z.
-  (* - unof 
-  - apply H.   *)
-Admitted.
-
-Lemma prefix_correct2:
-  forall (s: string) (tl: string),
-    substring 0 (String.length s) (s ++ tl) = s.
-Proof.
-  intros s tl.
-  induction s.
-  * simpl.
-    destruct tl; now simpl.
-  * simpl.
-    now rewrite IHs.
-Qed.
-
-Lemma substring_skip:
-  forall (s1 s2: string),
-    substring (length s1) (length (s1 ++ s2) - length s1) (s1 ++ s2) = s2.
-Proof.
-  intros s1 s2.
-  induction s1.
-  * simpl.
-    replace (length s2 - 0) with (length s2) by lia.
-    apply prefix_correct.
-    induction s2.
-    ** now simpl.
-    ** simpl.
-       rewrite IHs2.
-       destruct (ascii_dec a a).
-       *** reflexivity.
-       *** contradiction.
-  * simpl.
-    now rewrite IHs1.
-Qed.  
-
-Lemma substring_skip2:
-  forall (s1: string),
-    substring (length s1) 0 s1 = "".
-Proof.
-  intros.
-  induction s1.
-  * now simpl.
-  * simpl.
-    rewrite IHs1.
-    reflexivity.
-Qed. 
-
-Lemma prefix_eq:
-  forall (s1: string),
-    prefix s1 s1 = true.
-Proof.
-  intros s1.
-  unfold prefix.
-  induction s1.
-  * now simpl.
-  * simpl.
-    rewrite IHs1.
-    destruct ascii_dec.
-    ** reflexivity.
-    ** contradiction.
-Qed.
-
-Lemma prefix_correct3:
-  forall (s1: string),
-    substring 0 (String.length s1) s1 = s1.
-Proof.
-  intros.
-  induction s1.
-  * now simpl.
-  * simpl.
-    now rewrite IHs1.
-Qed. 
 
 Lemma serialize_parse_packet_id:
   forall (p: ParsedPacket) (s: string),
@@ -837,9 +715,9 @@ Proof.
     ** rewrite <- HUlenStr. 
        rewrite -> prefix_correct2.
        rewrite HUlenStr.
-       rewrite to_nat_of_nat2.
+       rewrite of_nat_to_nat2.
        all: swap 1 2.
-       rewrite is_one_byte_non_negative. reflexivity. congruence.
+       apply is_one_byte_non_negative. congruence.
        rewrite Uint63.eqb_refl.
        rewrite serialize_parse_byte by congruence.
        rewrite <- HUlenStr.
@@ -850,25 +728,31 @@ Proof.
        ***  generalize (is_one_byte_negative (password_len p)). intro HNeg.
             specialize (HNeg HUpass).
             congruence.
-       *** rewrite <- HUpassStr.
-           rewrite prefix_correct3.
-           rewrite HUpassStr.
-           rewrite to_nat_of_nat2.
-           all: swap 1 2.
-           rewrite is_one_byte_non_negative. reflexivity. congruence.
-           rewrite Uint63.eqb_refl.
-           rewrite <- HUpassStr.
-           replace (length (p_password p) - length (p_password p)) with 0 by lia.
-           rewrite substring_skip2.
-           replace 256%sint63 with (of_nat 256%nat) by now compute.
-           repeat rewrite <- of_nat_mult.
-           repeat rewrite <- of_nat_plus.
-           repeat rewrite split_two_bytes_eq_init.
-           rewrite <- Heqip.
-           rewrite <- Hlen1.
-           rewrite <- Hlen2.
-           rewrite <- Hlen3.
-           destruct p.
-           simpl.
-           reflexivity.
+       ***  rewrite <- HUpassStr.
+            rewrite prefix_correct3.
+            rewrite HUpassStr.
+            rewrite of_nat_to_nat2.
+            all: swap 1 2.
+            rewrite is_one_byte_non_negative. reflexivity. congruence.
+            rewrite Uint63.eqb_refl.
+            rewrite <- HUpassStr.
+            replace (length (p_password p) - length (p_password p)) with 0 by lia.
+            rewrite substring_skip2.
+            replace 256%sint63 with (of_nat 256%nat) by now compute.
+            repeat rewrite <- of_nat_mult.
+            all: swap 1 2. admit.
+            all: swap 1 2. admit.
+            all: swap 1 2. admit.
+            repeat rewrite <- of_nat_plus.
+            all: swap 1 2. admit.
+            all: swap 1 2. admit.
+            all: swap 1 2. admit.
+            repeat rewrite split_two_bytes_eq_init by auto.
+            rewrite <- Heqip.
+            rewrite <- Hlen1.
+            rewrite <- Hlen2.
+            rewrite <- Hlen3.
+            destruct p.
+            simpl.
+            reflexivity.
 Admitted.
