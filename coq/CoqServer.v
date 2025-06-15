@@ -37,8 +37,8 @@ Definition handle_connect (packet: ParsedPacket) (sdata: ServerData) (clnt_addr:
   match find_connection clnt_addr sdata with
   | Some conn =>
       match conn.(mode) with
-      | Normal => log_message "[CONNECT] OK" (fun _ => Ok (accepted_packet packet, sdata)) (* always allow for now *)
-      | Slip _ => log_message "[CONNECT] Already in slip mode" (fun _ => Ok (rejected_packet packet, sdata)) (* TODO: should it be rejected here? *)
+      | Normal => log_message "[CONNECT] OK" (fun _ => Ok (accepted_packet packet, sdata))
+      | Slip _ => log_message "[CONNECT] Already in slip mode" (fun _ => Ok (rejected_packet packet, sdata))
       end
   | None => log_message "[CONNECT] No existing connection found" (fun _ => Ok (rejected_packet packet, sdata))
   end.

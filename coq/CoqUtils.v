@@ -203,4 +203,4 @@ Definition remove_connection (addr: sockaddr) (sdata: ServerData) : ServerData :
 
 Definition update_connection (conn: Connection) (sdata: ServerData) : ServerData :=
 	sdata |> remove_connection conn.(client_addr)
-				|> add_connection conn.
+		  |> add_connection conn.
