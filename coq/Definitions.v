@@ -108,6 +108,7 @@ Record Connection : Set :=
       client_addr: sockaddr ;
       mode: ConnectionMode ;
       slip_addr: option Protocol.IPAddress ;
+      c_username: string ;
     }.
 
 Record ServerData : Set :=

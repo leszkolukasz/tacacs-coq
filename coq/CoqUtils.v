@@ -154,8 +154,6 @@ Definition empty_n_bytes (n: nat) : string :=
 	in helper n "".
 
 
-(* Returns a base packet which can be used to build a request packet. *)
-
 (* Returns a base packet which can be used to build a response packet. *)
 Definition prepare_reponse_packet (r: ResponseType) (packet: ParsedPacket) : ParsedPacket :=
 	packet 	|> with_packet_type PacketResponse
@@ -175,6 +173,7 @@ Definition with_mode (m: ConnectionMode) (conn: Connection) : Connection :=
 		client_addr := conn.(client_addr);
 		mode := m;
 		slip_addr := conn.(slip_addr);
+		c_username := conn.(c_username);
 	|}.
 
 Definition with_slip_addr (addr: option Protocol.IPAddress) (conn: Connection) : Connection :=
@@ -182,6 +181,7 @@ Definition with_slip_addr (addr: option Protocol.IPAddress) (conn: Connection) :
 		client_addr := conn.(client_addr);
 		mode := conn.(mode);
 		slip_addr := addr;
+		c_username := conn.(c_username);
 	|}.
 
 Definition with_connections (conns: list Connection) (sdata: ServerData) : ServerData :=

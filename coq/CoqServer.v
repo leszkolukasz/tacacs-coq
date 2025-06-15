@@ -18,7 +18,7 @@ Definition handle_login (packet: ParsedPacket) (sdata: ServerData) (clnt_addr: s
   | None => match find_user packet.(p_username) with
     | Some user =>
         if String.eqb user.(u_password) packet.(p_password) then
-          let conn := {| client_addr := clnt_addr ; mode := Normal ; slip_addr := None|} in
+          let conn := {| client_addr := clnt_addr ; mode := Normal ; slip_addr := None; c_username := packet.(p_username)|} in
           log_message "[LOGIN] OK" (fun _ => Ok (accepted_packet packet, add_connection conn sdata))
         else let opacket := rejected_packet packet
                             |> with_reason_type ReasonPassword in
@@ -46,10 +46,10 @@ Definition handle_connect (packet: ParsedPacket) (sdata: ServerData) (clnt_addr:
 Definition handle_superuser (packet: ParsedPacket) (sdata: ServerData) (clnt_addr: sockaddr): THandlePacket :=
   match find_connection clnt_addr sdata with
   | Some conn =>
-      match find_user packet.(p_username) with
+      match find_user conn.(c_username) with
       | Some user =>
-          if user.(superuser) then log_message "[CONNECT] OK" (fun _ => Ok (accepted_packet packet, sdata))
-          else log_message "[CONNECT] Not superuser" (fun _ => Ok (rejected_packet packet, sdata))
+          if user.(superuser) then log_message "[SUPERUSER] OK" (fun _ => Ok (accepted_packet packet, sdata))
+          else log_message "[SUPERUSER] Not superuser" (fun _ => Ok (rejected_packet packet, sdata))
       | None => Ok (rejected_packet packet, sdata)
       end
   | None => log_message "[SUPERUSER] No existing connection found" (fun _ => Ok (rejected_packet packet, sdata))
@@ -79,7 +79,6 @@ Definition handle_slip_on (packet: ParsedPacket) (sdata: ServerData) (clnt_addr:
   | Some conn =>
       match conn.(mode) with
       | Normal =>
-          (* Check if slip_addr is set before allowing SLIPON *)
           match conn.(slip_addr) with
           | Some _ =>
               let new_conn := with_mode (Slip false) conn in
