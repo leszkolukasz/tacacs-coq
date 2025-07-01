@@ -1,5 +1,7 @@
 ## TACACS protocol in Coq
 
+Implementation of the TACACS protocol in Coq and Ocaml. According to the [RFC1492](https://datatracker.ietf.org/doc/html/rfc1492).
+
 ### Commands
 
 - `make` - Build the project
